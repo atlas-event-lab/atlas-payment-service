@@ -1,0 +1,2 @@
+-- Payment Service initial schema placeholder.
+-- Domain tables are introduced in Phase 2 (V2__payment_domain.sql).

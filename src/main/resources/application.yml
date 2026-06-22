@@ -1,0 +1,76 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: payment-service
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/payment_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/atlas}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        spring.json.add.type.headers: 'false'
+    consumer:
+      group-id: payment-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: '*'
+        spring.json.value.default.type: java.util.LinkedHashMap
+        spring.json.use.type.headers: 'false'
+
+atlas:
+  outbox:
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:2000}
+  payment:
+    provider:
+      # Fake Payment Provider (WireMock). See services/payment/service.md §Provider Call.
+      base-url: ${PAYMENT_PROVIDER_URL:http://localhost:8081}
+      # Per-call timeout (service.md): a provider call exceeding this is a transient TIMEOUT.
+      timeout: ${PAYMENT_PROVIDER_TIMEOUT:5s}
+      # Total attempts = 1 initial + 2 retries (service.md). Transient failures only are retried.
+      max-attempts: ${PAYMENT_PROVIDER_MAX_ATTEMPTS:3}
+      # Wait BEFORE each attempt; index 0 = first attempt (0s), then 2s, then 5s (service.md).
+      backoff: ${PAYMENT_PROVIDER_BACKOFF:0s,2s,5s}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.atlas: INFO
+    org.springframework.security: WARN
