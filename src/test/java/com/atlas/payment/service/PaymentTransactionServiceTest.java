@@ -4,7 +4,7 @@ import com.atlas.payment.client.ProviderCallResult;
 import com.atlas.payment.entity.Payment;
 import com.atlas.payment.entity.PaymentStatus;
 import com.atlas.payment.event.PaymentEventPayload;
-import com.atlas.payment.event.PaymentEventTypes;
+import com.atlas.payment.shared.messaging.EventType;
 import com.atlas.payment.messaging.OutboxEventWriter;
 import com.atlas.payment.repository.ConsumedEventRepository;
 import com.atlas.payment.repository.PaymentRepository;
@@ -53,7 +53,7 @@ class PaymentTransactionServiceTest {
         verify(paymentRepository).save(any(Payment.class));
         verify(consumedEventRepository).save(any());
 
-        PaymentEventPayload payload = capturePayload(PaymentEventTypes.PAYMENT_REQUESTED);
+        PaymentEventPayload payload = capturePayload(EventType.PAYMENT_REQUESTED);
         assertThat(payload.status()).isEqualTo(PaymentStatus.PROCESSING);
         assertThat(payload.bookingId()).isEqualTo(BOOKING_ID);
         assertThat(payload.reason()).isNull();
@@ -97,7 +97,7 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(payment.getProviderTransactionId()).isEqualTo("txn-789");
         assertThat(payment.getAttempts()).hasSize(1);
-        PaymentEventPayload payload = capturePayload(PaymentEventTypes.PAYMENT_SUCCEEDED);
+        PaymentEventPayload payload = capturePayload(EventType.PAYMENT_SUCCEEDED);
         assertThat(payload.status()).isEqualTo(PaymentStatus.SUCCEEDED);
     }
 
@@ -111,7 +111,7 @@ class PaymentTransactionServiceTest {
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(payment.getReason()).isEqualTo("Insufficient funds");
-        PaymentEventPayload payload = capturePayload(PaymentEventTypes.PAYMENT_FAILED);
+        PaymentEventPayload payload = capturePayload(EventType.PAYMENT_FAILED);
         assertThat(payload.reason()).isEqualTo("Insufficient funds");
     }
 
@@ -127,7 +127,7 @@ class PaymentTransactionServiceTest {
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(payment.getAttempts()).hasSize(3);
-        capturePayload(PaymentEventTypes.PAYMENT_FAILED);
+        capturePayload(EventType.PAYMENT_FAILED);
     }
 
     @Test
@@ -141,7 +141,7 @@ class PaymentTransactionServiceTest {
                 PaymentTestData.timeoutAttempt(3))));
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.TIMED_OUT);
-        capturePayload(PaymentEventTypes.PAYMENT_TIMED_OUT);
+        capturePayload(EventType.PAYMENT_TIMED_OUT);
     }
 
     @Test
@@ -160,11 +160,11 @@ class PaymentTransactionServiceTest {
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private InventoryReservedCommand command() {
-        return new InventoryReservedCommand(BOOKING_ID, PaymentTestData.defaultAmount(),
+        return new InventoryReservedCommand(BOOKING_ID, PaymentTestData.defaultAmount().getAmount(),
                 PaymentTestData.CORRELATION_ID, PaymentTestData.SAGA_ID);
     }
 
-    private PaymentEventPayload capturePayload(String expectedEventType) {
+    private PaymentEventPayload capturePayload(EventType expectedEventType) {
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
         verify(outboxEventWriter).write(eq(BOOKING_ID), eq(expectedEventType),
                 any(), any(), payload.capture());

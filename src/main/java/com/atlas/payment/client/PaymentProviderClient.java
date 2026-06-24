@@ -6,13 +6,12 @@ import com.atlas.payment.client.dto.ProviderChargeResponse;
 import com.atlas.payment.entity.AttemptOutcome;
 import com.atlas.payment.entity.Money;
 import com.atlas.payment.entity.Payment;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import feign.FeignException;
+import feign.RetryableException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 import java.net.SocketTimeoutException;
 import java.time.Clock;
@@ -35,23 +34,22 @@ import java.util.List;
 @Component
 public class PaymentProviderClient {
 
-    private static final String PAYMENTS_PATH = "/payments";
-    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
-    private static final String SCENARIO_HEADER = "X-Payment-Scenario";
-
-    private final RestClient restClient;
+    private final PaymentProviderFeignClient providerClient;
     private final PaymentProviderProperties properties;
     private final Sleeper sleeper;
     private final Clock clock;
+    private final ObjectMapper objectMapper;
 
-    public PaymentProviderClient(RestClient paymentProviderRestClient,
+    public PaymentProviderClient(PaymentProviderFeignClient providerClient,
                                  PaymentProviderProperties properties,
                                  Sleeper sleeper,
-                                 Clock clock) {
-        this.restClient = paymentProviderRestClient;
+                                 Clock clock,
+                                 ObjectMapper objectMapper) {
+        this.providerClient = providerClient;
         this.properties = properties;
         this.sleeper = sleeper;
         this.clock = clock;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -83,47 +81,62 @@ public class PaymentProviderClient {
     private ProviderAttemptRecord attemptCharge(Payment payment, ProviderChargeRequest request, int attemptNumber) {
         Instant started = clock.instant();
         try {
-            HttpOutcome http = restClient.post()
-                    .uri(PAYMENTS_PATH)
-                    .headers(headers -> applyHeaders(headers, payment))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .exchange((req, res) ->
-                            new HttpOutcome(res.getStatusCode().value(), res.bodyTo(ProviderChargeResponse.class)));
+            ResponseEntity<ProviderChargeResponse> http =
+                    providerClient.charge(payment.getPaymentId().toString(), scenarioHeader(), request);
 
-            AttemptOutcome outcome = classify(http.status());
-            ProviderChargeResponse body = http.body();
-            ProviderResponseRecord response = new ProviderResponseRecord(
-                    http.status(),
-                    body == null ? null : body.status(),
-                    body == null ? null : body.transactionId(),
-                    body == null ? null : body.reason(),
-                    clock.instant());
-            String errorDetail = (outcome == AttemptOutcome.SUCCESS) ? null
-                    : "Provider HTTP " + http.status()
-                      + (body != null && body.reason() != null ? ": " + body.reason() : "");
-            return new ProviderAttemptRecord(attemptNumber, outcome, started, clock.instant(), errorDetail, response);
+            HttpOutcome outcome = new HttpOutcome(http.getStatusCode().value(), http.getBody());
+            return successAttempt(attemptNumber, started, outcome);
 
-        } catch (ResourceAccessException e) {
-            // Read/connect failure. A socket timeout is a TIMEOUT outcome; other I/O is transient.
+        } catch (RetryableException e) {
+            // Feign wraps connect/read I/O failures in RetryableException; a socket timeout is a
+            // TIMEOUT outcome, any other I/O is transient (mirrors the prior ResourceAccessException path).
             boolean timedOut = e.getCause() instanceof SocketTimeoutException;
             AttemptOutcome outcome = timedOut ? AttemptOutcome.TIMEOUT : AttemptOutcome.TRANSIENT_ERROR;
             log.warn("Provider call I/O failure: paymentId={}, attempt={}, timedOut={}, cause={}",
                     payment.getPaymentId(), attemptNumber, timedOut, e.getMessage());
             return new ProviderAttemptRecord(attemptNumber, outcome, started, clock.instant(),
                     e.getMessage(), null);
-        } catch (RestClientException e) {
-            log.warn("Provider call error: paymentId={}, attempt={}, cause={}",
-                    payment.getPaymentId(), attemptNumber, e.getMessage());
-            return new ProviderAttemptRecord(attemptNumber, AttemptOutcome.TRANSIENT_ERROR, started,
-                    clock.instant(), e.getMessage(), null);
+        } catch (FeignException e) {
+            // Non-2xx HTTP response: the status (and any error body) ride on the exception. 402/422
+            // map to DECLINED (never retried); 503 and other statuses are transient and retried.
+            HttpOutcome outcome = new HttpOutcome(e.status(), parseBody(e));
+            return successAttempt(attemptNumber, started, outcome);
         }
     }
 
-    private void applyHeaders(HttpHeaders headers, Payment payment) {
-        headers.add(IDEMPOTENCY_KEY_HEADER, payment.getPaymentId().toString());
-        if (properties.scenario() != null && !properties.scenario().isBlank()) {
-            headers.add(SCENARIO_HEADER, properties.scenario());
+    /** Builds an attempt record from an HTTP exchange (2xx or a non-2xx carried by FeignException). */
+    private ProviderAttemptRecord successAttempt(int attemptNumber, Instant started, HttpOutcome http) {
+        AttemptOutcome outcome = classify(http.status());
+        ProviderChargeResponse body = http.body();
+        ProviderResponseRecord response = new ProviderResponseRecord(
+                http.status(),
+                body == null ? null : body.status(),
+                body == null ? null : body.transactionId(),
+                body == null ? null : body.reason(),
+                clock.instant());
+        String errorDetail = (outcome == AttemptOutcome.SUCCESS) ? null
+                : "Provider HTTP " + http.status()
+                  + (body != null && body.reason() != null ? ": " + body.reason() : "");
+        return new ProviderAttemptRecord(attemptNumber, outcome, started, clock.instant(), errorDetail, response);
+    }
+
+    /** Resolves the optional WireMock scenario; {@code null} omits the header (service.md). */
+    private String scenarioHeader() {
+        String scenario = properties.scenario();
+        return (scenario != null && !scenario.isBlank()) ? scenario : null;
+    }
+
+    /** Parses the provider's error body when present; returns {@code null} for an empty/unreadable body. */
+    private ProviderChargeResponse parseBody(FeignException e) {
+        String content = e.contentUTF8();
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(content, ProviderChargeResponse.class);
+        } catch (Exception parseError) {
+            log.warn("Unparseable provider error body: status={}, cause={}", e.status(), parseError.getMessage());
+            return null;
         }
     }
 

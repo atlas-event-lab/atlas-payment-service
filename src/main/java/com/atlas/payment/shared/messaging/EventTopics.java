@@ -16,7 +16,7 @@ public final class EventTopics {
 
     // ── Payment Service consumes (owned by Inventory Service) ──
     // Single trigger: carries bookingId + amount (service.md §Trigger & Amount Source).
-    public static final String INVENTORY_BOOKING_RESERVED = "inventory.reserved";
+    public static final String INVENTORY_RESERVED = "inventory.reserved";
 
     private EventTopics() {}
 }

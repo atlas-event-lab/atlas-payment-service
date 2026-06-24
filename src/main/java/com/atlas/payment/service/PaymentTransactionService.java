@@ -11,10 +11,11 @@ import com.atlas.payment.entity.PaymentProviderResponse;
 import com.atlas.payment.entity.PaymentStatus;
 import com.atlas.payment.event.MoneyEvent;
 import com.atlas.payment.event.PaymentEventPayload;
-import com.atlas.payment.event.PaymentEventTypes;
 import com.atlas.payment.messaging.OutboxEventWriter;
 import com.atlas.payment.repository.ConsumedEventRepository;
 import com.atlas.payment.repository.PaymentRepository;
+import com.atlas.payment.shared.messaging.ConsumerEventType;
+import com.atlas.payment.shared.messaging.EventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,8 +36,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class PaymentTransactionService {
-
-    private static final String CONSUMED_EVENT_TYPE = "InventoryReserved";
 
     private final PaymentRepository paymentRepository;
     private final ConsumedEventRepository consumedEventRepository;
@@ -59,7 +58,7 @@ public class PaymentTransactionService {
         if (existing.isPresent()) {
             // A payment already exists for this booking (e.g. a re-trigger with a new eventId).
             // Record the event as consumed and do not charge again (EVT-008).
-            consumedEventRepository.save(new ConsumedEvent(eventId, CONSUMED_EVENT_TYPE));
+            consumedEventRepository.save(new ConsumedEvent(eventId, ConsumerEventType.INVENTORY_RESERVED));
             log.info("Payment already exists for booking, not charging again: bookingId={}, paymentId={}",
                     command.bookingId(), existing.get().getPaymentId());
             return Optional.empty();
@@ -77,11 +76,15 @@ public class PaymentTransactionService {
         payment.setStatus(PaymentStatus.PROCESSING);
         paymentRepository.save(payment);
 
-        consumedEventRepository.save(new ConsumedEvent(eventId, CONSUMED_EVENT_TYPE));
+        consumedEventRepository.save(new ConsumedEvent(eventId, ConsumerEventType.INVENTORY_RESERVED));
 
-        outboxEventWriter.write(payment.getBookingId(), PaymentEventTypes.PAYMENT_REQUESTED,
-                command.correlationId(), command.sagaId(),
-                payloadOf(payment, PaymentStatus.PROCESSING, null));
+        outboxEventWriter.write(
+            payment.getBookingId(),
+            EventType.PAYMENT_REQUESTED,
+            command.correlationId(),
+            command.sagaId(),
+            payloadOf(payment, PaymentStatus.PROCESSING, null)
+        );
 
         log.info("Payment processing started: paymentId={}, bookingId={}",
                 payment.getPaymentId(), payment.getBookingId());
@@ -125,13 +128,13 @@ public class PaymentTransactionService {
         ProviderAttemptRecord last = result.finalAttempt();
         int attempts = result.attempts().size();
         return switch (result.finalOutcome()) {
-            case SUCCESS -> new Terminal(PaymentStatus.SUCCEEDED, PaymentEventTypes.PAYMENT_SUCCEEDED,
+            case SUCCESS -> new Terminal(PaymentStatus.SUCCEEDED, EventType.PAYMENT_SUCCEEDED,
                     null, last.response() == null ? null : last.response().transactionId());
-            case DECLINED -> new Terminal(PaymentStatus.FAILED, PaymentEventTypes.PAYMENT_FAILED,
+            case DECLINED -> new Terminal(PaymentStatus.FAILED, EventType.PAYMENT_FAILED,
                     declineReason(last), null);
-            case TRANSIENT_ERROR -> new Terminal(PaymentStatus.FAILED, PaymentEventTypes.PAYMENT_FAILED,
+            case TRANSIENT_ERROR -> new Terminal(PaymentStatus.FAILED, EventType.PAYMENT_FAILED,
                     "Provider unavailable after " + attempts + " attempt(s)", null);
-            case TIMEOUT -> new Terminal(PaymentStatus.TIMED_OUT, PaymentEventTypes.PAYMENT_TIMED_OUT,
+            case TIMEOUT -> new Terminal(PaymentStatus.TIMED_OUT, EventType.PAYMENT_TIMED_OUT,
                     "Provider did not respond after " + attempts + " attempt(s)", null);
         };
     }
@@ -166,5 +169,5 @@ public class PaymentTransactionService {
     }
 
     /** Terminal resolution: target state, event type, optional reason and provider transaction id. */
-    private record Terminal(PaymentStatus status, String eventType, String reason, String transactionId) {}
+    private record Terminal(PaymentStatus status, EventType eventType, String reason, String transactionId) {}
 }

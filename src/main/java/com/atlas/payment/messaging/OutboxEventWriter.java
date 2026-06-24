@@ -2,7 +2,8 @@ package com.atlas.payment.messaging;
 
 import com.atlas.payment.entity.OutboxEvent;
 import com.atlas.payment.repository.OutboxRepository;
-import com.atlas.payment.shared.messaging.EventEnvelope;
+import com.atlas.payment.event.EventEnvelope;
+import com.atlas.payment.shared.messaging.EventType;
 import com.atlas.payment.shared.web.CorrelationIdFilter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,16 +38,16 @@ public class OutboxEventWriter {
      * Builds the full event envelope (message-envelope.md) and stores it as a PENDING outbox row.
      *
      * @param aggregateId   the Kafka partition key — {@code bookingId} (partitioning.md)
-     * @param eventType     event name, e.g. {@code PaymentSucceeded}
+     * @param eventType     produced event type, e.g. {@code PAYMENT_SUCCEEDED}
      * @param correlationId correlation id propagated through the saga (OBS-002)
      * @param sagaId        saga instance id (OBS-003)
      * @param payload       the business payload (never null, never carries metadata)
      */
-    public void write(UUID aggregateId, String eventType,
+    public void write(UUID aggregateId, EventType eventType,
                       String correlationId, String sagaId, Object payload) {
         var envelope = new EventEnvelope<>(
                 UUID.randomUUID(),
-                eventType,
+                eventType.name(),
                 EVENT_VERSION,
                 Instant.now(),
                 resolveTraceId(),

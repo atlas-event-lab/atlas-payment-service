@@ -2,11 +2,9 @@ package com.atlas.payment.messaging;
 
 import com.atlas.payment.entity.OutboxEvent;
 import com.atlas.payment.entity.OutboxStatus;
-import com.atlas.payment.event.PaymentEventTypes;
 import com.atlas.payment.repository.OutboxRepository;
 import com.atlas.payment.shared.messaging.EventTopics;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.atlas.payment.shared.messaging.EventType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -35,8 +33,7 @@ public class OutboxRelay {
             List.of(OutboxStatus.PENDING, OutboxStatus.FAILED);
 
     private final OutboxRepository outboxRepository;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final KafkaTemplate<String, String> kafkaTemplate;
 
     @Scheduled(fixedDelayString = "${atlas.outbox.poll-interval-ms:2000}")
     public void publishPending() {
@@ -52,11 +49,10 @@ public class OutboxRelay {
 
     private void publish(OutboxEvent event) {
         try {
-            JsonNode envelope = objectMapper.readTree(event.getPayload());
             String topic = resolveTopic(event.getEventType());
 
             // Block until the broker acknowledges so the row is only marked PUBLISHED on success.
-            kafkaTemplate.send(topic, event.getAggregateId().toString(), envelope).get();
+            kafkaTemplate.send(topic, event.getAggregateId().toString(), event.getPayload()).get();
 
             event.markPublished(Instant.now());
             outboxRepository.save(event);
@@ -78,13 +74,12 @@ public class OutboxRelay {
     }
 
     /** Maps an event type to its owning Payment topic (topics.md, payment-events.yaml). */
-    private String resolveTopic(String eventType) {
+    private String resolveTopic(EventType eventType) {
         return switch (eventType) {
-            case PaymentEventTypes.PAYMENT_REQUESTED  -> EventTopics.PAYMENT_REQUESTED;
-            case PaymentEventTypes.PAYMENT_SUCCEEDED  -> EventTopics.PAYMENT_SUCCEEDED;
-            case PaymentEventTypes.PAYMENT_FAILED     -> EventTopics.PAYMENT_FAILED;
-            case PaymentEventTypes.PAYMENT_TIMED_OUT  -> EventTopics.PAYMENT_TIMED_OUT;
-            default -> throw new IllegalStateException("No topic mapping for event type: " + eventType);
+            case PAYMENT_REQUESTED  -> EventTopics.PAYMENT_REQUESTED;
+            case PAYMENT_SUCCEEDED  -> EventTopics.PAYMENT_SUCCEEDED;
+            case PAYMENT_FAILED     -> EventTopics.PAYMENT_FAILED;
+            case PAYMENT_TIMED_OUT  -> EventTopics.PAYMENT_TIMED_OUT;
         };
     }
 }

@@ -1,5 +1,6 @@
 package com.atlas.payment.entity;
 
+import com.atlas.payment.shared.messaging.EventType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -45,8 +46,9 @@ public class OutboxEvent {
     @Column(name = "aggregate_id", nullable = false, updatable = false)
     private UUID aggregateId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, updatable = false, length = 100)
-    private String eventType;
+    private EventType eventType;
 
     @Column(name = "event_version", nullable = false, updatable = false)
     private int eventVersion;
@@ -71,7 +73,7 @@ public class OutboxEvent {
     private int attempts;
 
     public OutboxEvent(UUID id, String aggregateType, UUID aggregateId,
-                       String eventType, int eventVersion, String payload) {
+                       EventType eventType, int eventVersion, String payload) {
         this.id = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;

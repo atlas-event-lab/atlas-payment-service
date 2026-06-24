@@ -1,18 +1,21 @@
 package com.atlas.payment.messaging;
 
+import com.atlas.payment.event.EventValidator;
+import com.atlas.payment.event.InventoryReservedPayload;
 import com.atlas.payment.exception.InvalidPaymentStateTransitionException;
 import com.atlas.payment.service.InventoryReservedCommand;
 import com.atlas.payment.service.PaymentService;
+import com.atlas.payment.event.EventEnvelope;
 import com.atlas.payment.shared.messaging.EventTopics;
+import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
+import org.springframework.kafka.retrytopic.DltStrategy;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -38,65 +41,30 @@ public class PaymentEventConsumer {
     private static final long RETRY_MAX_DELAY_MS = 120_000L;
 
     private final PaymentService paymentService;
+    private final EventValidator eventValidator;
 
     @RetryableTopic(
             attempts = "4",
             backoff = @Backoff(delay = RETRY_DELAY_MS, multiplier = RETRY_MULTIPLIER, maxDelay = RETRY_MAX_DELAY_MS),
             dltTopicSuffix = ".dlq",
-            exclude = {InvalidPaymentStateTransitionException.class, IllegalArgumentException.class}
+            dltStrategy = DltStrategy.FAIL_ON_ERROR,
+            autoStartDltHandler = "false",
+            exclude = {InvalidPaymentStateTransitionException.class, IllegalArgumentException.class,
+                    ConstraintViolationException.class}
     )
-    @KafkaListener(topics = EventTopics.INVENTORY_BOOKING_RESERVED, groupId = "${spring.kafka.consumer.group-id}")
-    public void onInventoryReserved(Map<String, Object> envelope) {
-        UUID eventId = extractEventId(envelope);
-        Map<String, Object> payload = extractPayload(envelope);
+    @KafkaListener(topics = EventTopics.INVENTORY_RESERVED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onInventoryReserved(EventEnvelope<InventoryReservedPayload> envelope) {
+        eventValidator.validate(envelope);
+        UUID eventId = envelope.eventId();
+        InventoryReservedPayload payload = envelope.payload();
 
         InventoryReservedCommand command = new InventoryReservedCommand(
-                extractUuid(payload, "bookingId"),
-                extractTotalAmount(payload),
-                stringOrNull(envelope.get("correlationId")),
-                stringOrNull(envelope.get("sagaId")));
+                payload.bookingId(),
+                payload.total(),
+                envelope.correlationId(),
+                envelope.sagaId());
 
         log.info("Received InventoryReserved: eventId={}, bookingId={}", eventId, command.bookingId());
         paymentService.onInventoryReserved(eventId, command);
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private UUID extractEventId(Map<String, Object> envelope) {
-        Object raw = envelope.get("eventId");
-        if (raw == null) {
-            throw new IllegalArgumentException("Missing eventId in envelope");
-        }
-        return UUID.fromString(raw.toString());
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> extractPayload(Map<String, Object> envelope) {
-        Object raw = envelope.get("payload");
-        if (!(raw instanceof Map<?, ?>)) {
-            throw new IllegalArgumentException("Missing payload in envelope");
-        }
-        return (Map<String, Object>) raw;
-    }
-
-    private BigDecimal extractTotalAmount(Map<String, Object> payload) {
-        Object total = payload.get("total");
-        if (total == null) {
-            throw new IllegalArgumentException("Missing 'total' in InventoryReserved payload");
-        }
-
-        return new BigDecimal(total.toString());
-    }
-
-    private UUID extractUuid(Map<String, Object> payload, String field) {
-        Object raw = payload.get(field);
-        if (raw == null) {
-            throw new IllegalArgumentException("Missing field '" + field + "' in payload");
-        }
-        return UUID.fromString(raw.toString());
-    }
-
-    private String stringOrNull(Object value) {
-        return value == null ? null : value.toString();
     }
 }
