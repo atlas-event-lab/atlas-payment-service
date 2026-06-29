@@ -40,6 +40,7 @@ dependencies {
     implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
     compileOnly 'org.projectlombok:lombok'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13'
 
     annotationProcessor 'org.projectlombok:lombok'
 
@@ -51,4 +52,13 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+tasks.register("downloadOpenApi") {
+    doLast {
+        new URL("http://localhost:8085/v3/api-docs.yaml")
+                .withInputStream { input ->
+                    file("$projectDir/build/payment.yaml").bytes = input.bytes
+                }
+    }
 }
