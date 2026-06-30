@@ -1,5 +1,5 @@
 server:
-  port: 8085
+  port: 8080
 
 springdoc:
   api-docs:
@@ -70,6 +70,8 @@ atlas:
       backoff: ${PAYMENT_PROVIDER_BACKOFF:0s,2s,5s}
 
 management:
+  server:
+    port: 9090
   endpoints:
     web:
       exposure:
@@ -77,6 +79,8 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: true
 
 logging:
   level:

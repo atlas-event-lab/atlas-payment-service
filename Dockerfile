@@ -32,10 +32,10 @@ ENV JAVA_OPTS="\
   -XX:+ExitOnOutOfMemoryError \
   -Djava.security.egd=file:/dev/./urandom"
 
-EXPOSE 8080
+EXPOSE 8080 9090
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD wget -qO- http://localhost:8086/actuator/health || exit 1
+  CMD wget -qO- http://localhost:9090/actuator/health/readiness || exit 1
 
 # Entrypoint con JVM opts
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
