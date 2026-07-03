@@ -77,6 +77,12 @@ management:
   server:
     port: 9090
   tracing:
+    baggage:
+      remote-fields:
+        - correlationId
+      correlation:
+        fields:
+          - correlationId
     sampling:
       probability: 1.0
   otlp:
