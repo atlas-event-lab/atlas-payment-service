@@ -42,6 +42,8 @@ spring:
       observation-enabled: true
     listener:
       observation-enabled: true
+      # pods_max x concurrency <= partitions of inventory.reserved (6) to avoid idle threads.
+      concurrency: ${KAFKA_CONCURRENCY:2}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
