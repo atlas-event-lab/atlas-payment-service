@@ -35,7 +35,7 @@ public class PaymentProviderResponse {
 
     @Setter
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "attempt_id", nullable = false, updatable = false, unique = true)
+    @JoinColumn(name = "attempt_id", nullable = false, updatable = false)
     private PaymentAttempt attempt;
 
     @Column(name = "http_status", nullable = false)

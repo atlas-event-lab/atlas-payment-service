@@ -50,7 +50,7 @@ public class Payment {
     @ToString.Include
     private UUID paymentId;
 
-    @Column(name = "booking_id", nullable = false, updatable = false, unique = true)
+    @Column(name = "booking_id", nullable = false, updatable = false)
     private UUID bookingId;
 
     @Setter
