@@ -36,6 +36,11 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/atlas}
 
+  task:
+    scheduling:
+      pool:
+        # Headroom so a long outbox drain cycle can't starve the other @Scheduled jobs.
+        size: ${SCHEDULER_POOL_SIZE:3}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     template:
@@ -50,6 +55,10 @@ spring:
       acks: all
       properties:
         spring.json.add.type.headers: 'false'
+        # The outbox relay dispatches a whole poll batch before flushing (ADR-0013); let the
+        # producer accumulate those sends briefly and ship them in few broker round-trips.
+        linger.ms: 20
+        batch.size: 65536
     consumer:
       group-id: payment-service
       auto-offset-reset: earliest
@@ -63,7 +72,10 @@ spring:
 
 atlas:
   outbox:
-    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:2000}
+    # Adaptive relay scheduling (ADR-0013): poll fast under load, back off when idle.
+    min-interval-ms: ${OUTBOX_MIN_INTERVAL_MS:250}
+    max-interval-ms: ${OUTBOX_MAX_INTERVAL_MS:5000}
+    max-drain-loops: ${OUTBOX_MAX_DRAIN_LOOPS:10}
   payment:
     provider:
       # Fake Payment Provider (WireMock). See services/payment/service.md §Provider Call.
