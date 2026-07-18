@@ -9,10 +9,12 @@ import com.atlas.payment.messaging.OutboxEventWriter;
 import com.atlas.payment.repository.ConsumedEventRepository;
 import com.atlas.payment.repository.PaymentRepository;
 import com.atlas.payment.support.PaymentTestData;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,7 +39,16 @@ class PaymentTransactionServiceTest {
     @Mock ConsumedEventRepository consumedEventRepository;
     @Mock OutboxEventWriter outboxEventWriter;
 
-    @InjectMocks PaymentTransactionService service;
+    // Real registry (not a mock) so the idempotency-skip counters can be asserted (ADR-0020).
+    MeterRegistry meterRegistry;
+    PaymentTransactionService service;
+
+    @BeforeEach
+    void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+        service = new PaymentTransactionService(
+                paymentRepository, consumedEventRepository, outboxEventWriter, meterRegistry);
+    }
 
     // ── beginProcessing ───────────────────────────────────────────────────────
 
@@ -68,6 +79,7 @@ class PaymentTransactionServiceTest {
         assertThat(result).isEmpty();
         verify(paymentRepository, never()).save(any());
         verifyNoInteractions(outboxEventWriter);
+        assertThat(skipCount(PaymentTransactionService.SKIP_DUPLICATE)).isEqualTo(1.0);
     }
 
     @Test
@@ -82,6 +94,7 @@ class PaymentTransactionServiceTest {
         verify(consumedEventRepository).save(any()); // event recorded so it is not reprocessed
         verify(paymentRepository, never()).save(any());
         verifyNoInteractions(outboxEventWriter);
+        assertThat(skipCount(PaymentTransactionService.SKIP_ALREADY_CHARGED)).isEqualTo(1.0);
     }
 
     // ── resolve ───────────────────────────────────────────────────────────────
@@ -155,6 +168,7 @@ class PaymentTransactionServiceTest {
 
         verify(paymentRepository, never()).save(any());
         verifyNoInteractions(outboxEventWriter);
+        assertThat(skipCount(PaymentTransactionService.SKIP_ALREADY_RESOLVED)).isEqualTo(1.0);
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
@@ -162,6 +176,11 @@ class PaymentTransactionServiceTest {
     private InventoryReservedCommand command() {
         return new InventoryReservedCommand(BOOKING_ID, PaymentTestData.defaultAmount().getAmount(),
                 PaymentTestData.CORRELATION_ID, PaymentTestData.SAGA_ID);
+    }
+
+    private double skipCount(String reason) {
+        return meterRegistry.counter("atlas.payment.events.skipped",
+                "reason", reason, "event", "inventory_reserved").count();
     }
 
     private PaymentEventPayload capturePayload(EventType expectedEventType) {

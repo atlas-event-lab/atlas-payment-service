@@ -3,6 +3,7 @@ package com.atlas.payment.service;
 import com.atlas.payment.client.PaymentProviderClient;
 import com.atlas.payment.client.ProviderCallResult;
 import com.atlas.payment.entity.Payment;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,12 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentTransactionService transactionService;
     private final PaymentProviderClient providerClient;
+    private final MeterRegistry meterRegistry;
+
+    // Charge calls actually sent to the provider, tagged by final outcome (ADR-0020,
+    // Experiment 04). The service-side "no double charge" signal: this counter must track the
+    // payments created, never ≈ 2×. Prometheus: atlas_payment_provider_calls_total.
+    private static final String M_PROVIDER_CALLS = "atlas.payment.provider.calls";
 
     @Override
     public void onInventoryReserved(UUID eventId, InventoryReservedCommand command) {
@@ -38,6 +45,8 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = started.get();
 
         ProviderCallResult result = providerClient.charge(payment);
+        meterRegistry.counter(M_PROVIDER_CALLS,
+                "outcome", result.finalOutcome().name().toLowerCase()).increment();
 
         transactionService.resolve(payment.getPaymentId(), result);
     }

@@ -16,6 +16,7 @@ import com.atlas.payment.repository.ConsumedEventRepository;
 import com.atlas.payment.repository.PaymentRepository;
 import com.atlas.payment.shared.messaging.ConsumerEventType;
 import com.atlas.payment.shared.messaging.EventType;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,16 @@ public class PaymentTransactionService {
     private final PaymentRepository paymentRepository;
     private final ConsumedEventRepository consumedEventRepository;
     private final OutboxEventWriter outboxEventWriter;
+    private final MeterRegistry meterRegistry;
+
+    // Idempotency skips made visible (ADR-0020, Experiment 04). At-least-once delivery means
+    // redelivery happens; each guard branch increments this counter so effectively-once under
+    // crash-recovery is a positive signal, not an invisible no-op. Naming: dot-notation becomes
+    // atlas_payment_events_skipped_total in Prometheus.
+    private static final String M_SKIPPED = "atlas.payment.events.skipped";
+    static final String SKIP_DUPLICATE = "duplicate";
+    static final String SKIP_ALREADY_CHARGED = "already_charged";
+    static final String SKIP_ALREADY_RESOLVED = "already_resolved";
 
     /**
      * TX1 — dedupe, create the Payment, transition CREATED → PROCESSING and emit
@@ -49,6 +60,7 @@ public class PaymentTransactionService {
     @Transactional
     public Optional<Payment> beginProcessing(UUID eventId, InventoryReservedCommand command) {
         if (consumedEventRepository.existsById(eventId)) {
+            recordSkip(SKIP_DUPLICATE);
             log.info("Skipping duplicate InventoryReserved: eventId={}, bookingId={}",
                     eventId, command.bookingId());
             return Optional.empty();
@@ -59,6 +71,7 @@ public class PaymentTransactionService {
             // A payment already exists for this booking (e.g. a re-trigger with a new eventId).
             // Record the event as consumed and do not charge again (EVT-008).
             consumedEventRepository.save(new ConsumedEvent(eventId, ConsumerEventType.INVENTORY_RESERVED));
+            recordSkip(SKIP_ALREADY_CHARGED);
             log.info("Payment already exists for booking, not charging again: bookingId={}, paymentId={}",
                     command.bookingId(), existing.get().getPaymentId());
             return Optional.empty();
@@ -101,6 +114,7 @@ public class PaymentTransactionService {
                 .orElseThrow(() -> new IllegalStateException("Payment vanished mid-flight: " + paymentId));
 
         if (payment.isTerminal()) {
+            recordSkip(SKIP_ALREADY_RESOLVED);
             log.info("Payment already resolved, ignoring duplicate outcome: paymentId={}, status={}",
                     paymentId, payment.getStatus());
             return;
@@ -156,6 +170,11 @@ public class PaymentTransactionService {
                     response.receivedAt()));
         }
         return attempt;
+    }
+
+    private void recordSkip(String reason) {
+        meterRegistry.counter(M_SKIPPED, "reason", reason,
+                "event", ConsumerEventType.INVENTORY_RESERVED.name().toLowerCase()).increment();
     }
 
     private PaymentEventPayload payloadOf(Payment payment, PaymentStatus status, String reason) {
