@@ -3,6 +3,8 @@ package com.atlas.payment.service;
 import com.atlas.payment.client.PaymentProviderClient;
 import com.atlas.payment.client.ProviderCallResult;
 import com.atlas.payment.entity.Payment;
+import com.atlas.payment.entity.PaymentStatus;
+import com.atlas.payment.repository.PaymentRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,12 +31,11 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentTransactionService transactionService;
     private final PaymentProviderClient providerClient;
+    private final PaymentRepository paymentRepository;
     private final MeterRegistry meterRegistry;
 
-    // Charge calls actually sent to the provider, tagged by final outcome (ADR-0020,
-    // Experiment 04). The service-side "no double charge" signal: this counter must track the
-    // payments created, never ≈ 2×. Prometheus: atlas_payment_provider_calls_total.
     private static final String M_PROVIDER_CALLS = "atlas.payment.provider.calls";
+    private static final String M_RECOVERIES = "atlas.payment.recoveries";
 
     @Override
     public void onInventoryReserved(UUID eventId, InventoryReservedCommand command) {
@@ -42,12 +43,32 @@ public class PaymentServiceImpl implements PaymentService {
         if (started.isEmpty()) {
             return; // duplicate event or a payment already exists for this booking
         }
-        Payment payment = started.get();
+        chargeAndResolve(started.get());
+    }
 
+    @Override
+    public void recoverStalePayment(UUID paymentId) {
+        Optional<Payment> found = paymentRepository.findById(paymentId);
+        if (found.isEmpty() || found.get().getStatus() != PaymentStatus.PROCESSING) {
+            log.debug("Skipping recovery, payment no longer PROCESSING: paymentId={}", paymentId);
+            return;
+        }
+        Payment payment = found.get();
+        log.warn("Recovering stale PROCESSING payment: paymentId={}, bookingId={}",
+                payment.getPaymentId(), payment.getBookingId());
+
+        ProviderCallResult result = chargeAndResolve(payment);
+        meterRegistry.counter(M_RECOVERIES,
+                "outcome", result.finalOutcome().name().toLowerCase()).increment();
+    }
+
+    /** The shared post-TX1 path: provider call (outside any transaction), then TX2 resolve. */
+    private ProviderCallResult chargeAndResolve(Payment payment) {
         ProviderCallResult result = providerClient.charge(payment);
         meterRegistry.counter(M_PROVIDER_CALLS,
                 "outcome", result.finalOutcome().name().toLowerCase()).increment();
 
         transactionService.resolve(payment.getPaymentId(), result);
+        return result;
     }
 }

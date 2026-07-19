@@ -86,6 +86,11 @@ atlas:
       max-attempts: ${PAYMENT_PROVIDER_MAX_ATTEMPTS:3}
       # Wait BEFORE each attempt; index 0 = first attempt (0s), then 2s, then 5s (service.md).
       backoff: ${PAYMENT_PROVIDER_BACKOFF:0s,2s,5s}
+    recovery:
+      # Stale-PROCESSING recovery sweep (ADR-0021): re-drives payments orphaned by a crash
+      # between TX1 and TX2, charging with the same Idempotency-Key (never double-charges).
+      stale-after: ${PAYMENT_RECOVERY_STALE_AFTER:3m}
+      sweep-interval-ms: ${PAYMENT_RECOVERY_SWEEP_INTERVAL_MS:60000}
 
 management:
   server:

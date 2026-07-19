@@ -129,9 +129,15 @@ public class PaymentTransactionService {
         payment.setProviderTransactionId(terminal.transactionId());
         paymentRepository.save(payment);
 
-        outboxEventWriter.write(payment.getBookingId(), terminal.eventType(),
-                payment.getCorrelationId(), payment.getSagaId(),
-                payloadOf(payment, terminal.status(), terminal.reason()));
+        outboxEventWriter.write(
+            payment.getBookingId(),
+            terminal.eventType(),
+            payment.getCorrelationId(),
+            payment.getSagaId(),
+            payloadOf(payment,
+                terminal.status(),
+                terminal.reason())
+        );
 
         log.info("Payment resolved: paymentId={}, bookingId={}, status={}, attempts={}",
                 paymentId, payment.getBookingId(), terminal.status(), result.attempts().size());

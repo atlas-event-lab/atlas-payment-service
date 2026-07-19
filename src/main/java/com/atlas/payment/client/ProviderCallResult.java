@@ -19,7 +19,7 @@ public record ProviderCallResult(List<ProviderAttemptRecord> attempts) {
     }
 
     public ProviderAttemptRecord finalAttempt() {
-        return attempts.get(attempts.size() - 1);
+        return attempts.getLast();
     }
 
     public AttemptOutcome finalOutcome() {
