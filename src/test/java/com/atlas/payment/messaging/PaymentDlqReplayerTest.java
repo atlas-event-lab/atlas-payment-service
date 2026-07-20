@@ -25,7 +25,7 @@ class PaymentDlqReplayerTest {
 
     @BeforeEach
     void setup() {
-        when(dlt.getContainerProperties()).thenReturn(new ContainerProperties("inventory.reserved.dlq"));
+        when(dlt.getContainerProperties()).thenReturn(new ContainerProperties("inventory.reserved-payment.dlq"));
         when(dlt.getListenerId()).thenReturn("payment-dlt");
         when(main.getContainerProperties()).thenReturn(new ContainerProperties("inventory.reserved"));
         when(main.getListenerId()).thenReturn("payment-main");
@@ -76,7 +76,7 @@ class PaymentDlqReplayerTest {
         when(dlt.isRunning()).thenReturn(true);
         ListenerContainerIdleEvent event = mock(ListenerContainerIdleEvent.class);
         when(event.getTopicPartitions())
-                .thenReturn(List.of(new TopicPartition("inventory.reserved.dlq", 0)));
+                .thenReturn(List.of(new TopicPartition("inventory.reserved-payment.dlq", 0)));
 
         replayer.onDltIdle(event);
 

@@ -72,7 +72,8 @@ public class PaymentEventConsumer {
     @RetryableTopic(
             attempts = "4",
             backoff = @Backoff(delay = RETRY_DELAY_MS, multiplier = RETRY_MULTIPLIER, maxDelay = RETRY_MAX_DELAY_MS),
-            dltTopicSuffix = ".dlq",
+            retryTopicSuffix = "-payment-retry",
+            dltTopicSuffix = "-payment.dlq",
             dltStrategy = DltStrategy.FAIL_ON_ERROR,
             autoStartDltHandler = "false",   // started on demand via /actuator/dlqreplay (ADR-0022)
             exclude = {InvalidPaymentStateTransitionException.class, IllegalArgumentException.class,
