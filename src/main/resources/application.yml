@@ -91,6 +91,9 @@ atlas:
       # between TX1 and TX2, charging with the same Idempotency-Key (never double-charges).
       stale-after: ${PAYMENT_RECOVERY_STALE_AFTER:3m}
       sweep-interval-ms: ${PAYMENT_RECOVERY_SWEEP_INTERVAL_MS:60000}
+    dlq:
+      # Manual DLQ replay. Gates the @DltHandler: false = parked messages stay parked
+      auto-start: ${ATLAS_PAYMENT_DLQ_AUTO_START:false}
 
 management:
   server:
