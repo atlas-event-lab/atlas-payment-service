@@ -38,13 +38,13 @@ import java.util.UUID;
  * this Kafka-consumer retry is for delivery/processing faults; the provider-call timeout/retry is
  * a separate, inner policy owned by the provider client.
  * <p>
- * DLQ replay (ADR-0022, Experiment 06): the DLT handler is <b>manually started</b> —
- * {@code autoStartDltHandler} is gated on {@code atlas.payment.dlq.auto-start} (default false), so
- * parked messages stay parked until an operator deliberately enables replay (env flag + rollout).
- * When started, {@link #onInventoryReservedDlt} drains {@code inventory.reserved.dlq}: records that
- * parked on a <i>recoverable</i> (retries-exhausted) fault are re-driven through the idempotent
- * normal path; genuinely poison records (validation / forbidden transition) are quarantined, never
- * reprocessed.
+ * DLQ replay (ADR-0022, Experiment 06): the DLT handler is registered <b>stopped</b>
+ * ({@code autoStartDltHandler="false"}), so parked messages stay parked until an operator
+ * deliberately starts it at runtime via the {@code /actuator/dlqreplay} endpoint
+ * ({@link PaymentDlqReplayer}) — no redeploy. When started, {@link #onInventoryReservedDlt} drains
+ * {@code inventory.reserved.dlq}: records that parked on a <i>recoverable</i> (retries-exhausted)
+ * fault are re-driven through the idempotent normal path; genuinely poison records (validation /
+ * forbidden transition) are quarantined, never reprocessed.
  */
 @Slf4j
 @Component
@@ -74,7 +74,7 @@ public class PaymentEventConsumer {
             backoff = @Backoff(delay = RETRY_DELAY_MS, multiplier = RETRY_MULTIPLIER, maxDelay = RETRY_MAX_DELAY_MS),
             dltTopicSuffix = ".dlq",
             dltStrategy = DltStrategy.FAIL_ON_ERROR,
-            autoStartDltHandler = "${atlas.payment.dlq.auto-start:false}",
+            autoStartDltHandler = "false",   // started on demand via /actuator/dlqreplay (ADR-0022)
             exclude = {InvalidPaymentStateTransitionException.class, IllegalArgumentException.class,
                     ConstraintViolationException.class}
     )
