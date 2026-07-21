@@ -2,7 +2,6 @@ package com.atlas.payment.event;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotNull;
-
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -13,10 +12,4 @@ import java.util.UUID;
  * {@code @JsonIgnoreProperties(ignoreUnknown = true)}.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record InventoryReservedPayload(
-        @NotNull
-        UUID bookingId,
-
-        @NotNull
-        BigDecimal total
-) {}
+public record InventoryReservedPayload(@NotNull UUID bookingId, @NotNull BigDecimal total) {}

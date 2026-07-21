@@ -9,8 +9,4 @@ import java.util.UUID;
  * see docs/features/payment/implementation_plan.md §Provider Contract Assumption):
  * {@code POST {base-url}/payments} with header {@code Idempotency-Key: <paymentId>}.
  */
-public record ProviderChargeRequest(
-        UUID paymentId,
-        UUID bookingId,
-        MoneyDto amount
-) {}
+public record ProviderChargeRequest(UUID paymentId, UUID bookingId, MoneyDto amount) {}

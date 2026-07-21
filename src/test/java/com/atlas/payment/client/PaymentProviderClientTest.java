@@ -1,5 +1,13 @@
 package com.atlas.payment.client;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.atlas.payment.client.dto.ProviderChargeRequest;
 import com.atlas.payment.client.dto.ProviderChargeResponse;
 import com.atlas.payment.entity.AttemptOutcome;
@@ -8,14 +16,8 @@ import com.atlas.payment.support.PaymentTestData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import feign.FeignException;
 import feign.Request;
-import feign.RetryableException;
 import feign.Response;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-
+import feign.RetryableException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -23,15 +25,11 @@ import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 /**
  * Verifies the provider call retry policy (services/payment/service.md §Provider Call): transient
@@ -80,8 +78,8 @@ class PaymentProviderClientTest {
     @Test
     void declined_is_not_retried() {
         when(feignClient.charge(any(), isNull(), any()))
-                .thenThrow(httpError(HttpStatus.PAYMENT_REQUIRED,
-                        "{\"status\":\"DECLINED\",\"reason\":\"Card declined\"}"));
+                .thenThrow(httpError(
+                        HttpStatus.PAYMENT_REQUIRED, "{\"status\":\"DECLINED\",\"reason\":\"Card declined\"}"));
 
         ProviderCallResult result = client.charge(payment());
 
@@ -93,8 +91,7 @@ class PaymentProviderClientTest {
 
     @Test
     void transient_503_is_retried_up_to_max_attempts() {
-        when(feignClient.charge(any(), isNull(), any()))
-                .thenThrow(httpError(HttpStatus.SERVICE_UNAVAILABLE, null));
+        when(feignClient.charge(any(), isNull(), any())).thenThrow(httpError(HttpStatus.SERVICE_UNAVAILABLE, null));
 
         ProviderCallResult result = client.charge(payment());
 
@@ -118,8 +115,7 @@ class PaymentProviderClientTest {
 
     @Test
     void persistent_timeout_is_retried_then_classified_as_timeout() {
-        when(feignClient.charge(any(), isNull(), any()))
-                .thenThrow(socketTimeout());
+        when(feignClient.charge(any(), isNull(), any())).thenThrow(socketTimeout());
 
         ProviderCallResult result = client.charge(payment());
 
@@ -147,16 +143,23 @@ class PaymentProviderClientTest {
 
     /** A read timeout as Feign surfaces it: RetryableException whose cause is a SocketTimeoutException. */
     private RetryableException socketTimeout() {
-        return new RetryableException(-1, "read timed out", Request.HttpMethod.POST,
-                new SocketTimeoutException("read timed out"), (Long) null, dummyRequest());
+        return new RetryableException(
+                -1,
+                "read timed out",
+                Request.HttpMethod.POST,
+                new SocketTimeoutException("read timed out"),
+                (Long) null,
+                dummyRequest());
     }
 
     private Request dummyRequest() {
-        return Request.create(Request.HttpMethod.POST, PROVIDER_URL,
-                Collections.emptyMap(), Request.Body.empty(), null);
+        return Request.create(
+                Request.HttpMethod.POST, PROVIDER_URL, Collections.emptyMap(), Request.Body.empty(), null);
     }
 
     private Sleeper noOpSleeper() {
-        return duration -> { /* deterministic: no real backoff wait in tests */ };
+        return duration -> {
+            /* deterministic: no real backoff wait in tests */
+        };
     }
 }

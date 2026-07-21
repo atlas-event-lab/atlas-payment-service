@@ -11,14 +11,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * A single provider call attempt within {@code PROCESSING} (services/payment/service.md §Provider
@@ -63,8 +62,13 @@ public class PaymentAttempt {
     @OneToOne(mappedBy = "attempt", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private PaymentProviderResponse response;
 
-    public PaymentAttempt(UUID id, int attemptNumber, AttemptOutcome outcome,
-                          Instant startedAt, Instant completedAt, String errorDetail) {
+    public PaymentAttempt(
+            UUID id,
+            int attemptNumber,
+            AttemptOutcome outcome,
+            Instant startedAt,
+            Instant completedAt,
+            String errorDetail) {
         this.id = id;
         this.attemptNumber = attemptNumber;
         this.outcome = outcome;

@@ -1,15 +1,16 @@
 package com.atlas.payment.messaging;
 
+import com.atlas.payment.event.EventEnvelope;
 import com.atlas.payment.event.EventValidator;
 import com.atlas.payment.event.InventoryReservedPayload;
 import com.atlas.payment.exception.InvalidPaymentStateTransitionException;
 import com.atlas.payment.service.InventoryReservedCommand;
 import com.atlas.payment.service.PaymentService;
-import com.atlas.payment.event.EventEnvelope;
 import com.atlas.payment.shared.messaging.ConsumerEventType;
 import com.atlas.payment.shared.messaging.EventTopics;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.validation.ConstraintViolationException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.DltHandler;
@@ -21,8 +22,6 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
-
-import java.util.UUID;
 
 /**
  * Kafka consumer for the Payment side of the booking choreography saga (services/payment/service.md).
@@ -62,7 +61,8 @@ public class PaymentEventConsumer {
     static final String REASON_RETRIES_EXHAUSTED = "retries_exhausted";
     static final String OUTCOME_REPROCESSED = "reprocessed";
     static final String OUTCOME_QUARANTINED = "quarantined";
-    private static final String EVENT_TAG = ConsumerEventType.INVENTORY_RESERVED.name().toLowerCase();
+    private static final String EVENT_TAG =
+            ConsumerEventType.INVENTORY_RESERVED.name().toLowerCase();
     private static final String EVENT_KEY = "event";
 
     private final PaymentService paymentService;
@@ -75,10 +75,12 @@ public class PaymentEventConsumer {
             retryTopicSuffix = "-payment-retry",
             dltTopicSuffix = "-payment.dlq",
             dltStrategy = DltStrategy.FAIL_ON_ERROR,
-            autoStartDltHandler = "false",   // started on demand via /actuator/dlqreplay (ADR-0022)
-            exclude = {InvalidPaymentStateTransitionException.class, IllegalArgumentException.class,
-                    ConstraintViolationException.class}
-    )
+            autoStartDltHandler = "false", // started on demand via /actuator/dlqreplay (ADR-0022)
+            exclude = {
+                InvalidPaymentStateTransitionException.class,
+                IllegalArgumentException.class,
+                ConstraintViolationException.class
+            })
     @KafkaListener(topics = EventTopics.INVENTORY_RESERVED, groupId = "${spring.kafka.consumer.group-id}")
     public void onInventoryReserved(EventEnvelope<InventoryReservedPayload> envelope) {
         eventValidator.validate(envelope);
@@ -86,10 +88,7 @@ public class PaymentEventConsumer {
         InventoryReservedPayload payload = envelope.payload();
 
         InventoryReservedCommand command = new InventoryReservedCommand(
-                payload.bookingId(),
-                payload.total(),
-                envelope.correlationId(),
-                envelope.sagaId());
+                payload.bookingId(), payload.total(), envelope.correlationId(), envelope.sagaId());
 
         log.info("Received InventoryReserved: eventId={}, bookingId={}", eventId, command.bookingId());
         paymentService.onInventoryReserved(eventId, command);
@@ -109,28 +108,33 @@ public class PaymentEventConsumer {
             @Header(name = KafkaHeaders.DLT_EXCEPTION_FQCN, required = false) String exceptionFqcn) {
 
         String reason = classifyParkReason(envelope, exceptionFqcn);
-        meterRegistry.counter(M_DLQ_PARKED, "reason", reason, EVENT_KEY, EVENT_TAG).increment();
+        meterRegistry
+                .counter(M_DLQ_PARKED, "reason", reason, EVENT_KEY, EVENT_TAG)
+                .increment();
 
         if (!REASON_RETRIES_EXHAUSTED.equals(reason)) {
             // Poison: re-driving unchanged bytes just re-fails. Quarantine (log + count), do not reprocess.
-            log.warn("DLQ replay: quarantining poison record (not reprocessing): reason={}, exception={}, eventId={}",
-                    reason, exceptionFqcn, envelope == null ? null : envelope.eventId());
-            meterRegistry.counter(M_DLQ_REPLAYED, "outcome", OUTCOME_QUARANTINED, EVENT_KEY, EVENT_TAG).increment();
+            log.warn(
+                    "DLQ replay: quarantining poison record (not reprocessing): reason={}, exception={}, eventId={}",
+                    reason,
+                    exceptionFqcn,
+                    envelope == null ? null : envelope.eventId());
+            meterRegistry
+                    .counter(M_DLQ_REPLAYED, "outcome", OUTCOME_QUARANTINED, EVENT_KEY, EVENT_TAG)
+                    .increment();
             return;
         }
 
         UUID eventId = envelope.eventId();
         InventoryReservedPayload payload = envelope.payload();
         InventoryReservedCommand command = new InventoryReservedCommand(
-                payload.bookingId(),
-                payload.total(),
-                envelope.correlationId(),
-                envelope.sagaId());
+                payload.bookingId(), payload.total(), envelope.correlationId(), envelope.sagaId());
 
-        log.warn("DLQ replay: re-driving recoverable record: eventId={}, bookingId={}",
-                eventId, command.bookingId());
+        log.warn("DLQ replay: re-driving recoverable record: eventId={}, bookingId={}", eventId, command.bookingId());
         paymentService.onInventoryReserved(eventId, command);
-        meterRegistry.counter(M_DLQ_REPLAYED, "outcome", OUTCOME_REPROCESSED, EVENT_KEY, EVENT_TAG).increment();
+        meterRegistry
+                .counter(M_DLQ_REPLAYED, "outcome", OUTCOME_REPROCESSED, EVENT_KEY, EVENT_TAG)
+                .increment();
     }
 
     /**

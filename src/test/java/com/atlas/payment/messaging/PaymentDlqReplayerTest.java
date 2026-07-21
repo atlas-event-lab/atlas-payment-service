@@ -1,5 +1,12 @@
 package com.atlas.payment.messaging;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.util.List;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,13 +15,6 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.event.ListenerContainerIdleEvent;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.MessageListenerContainer;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class PaymentDlqReplayerTest {
 
@@ -75,12 +75,11 @@ class PaymentDlqReplayerTest {
     void onDltIdle_autoStopsTheRunningDltContainer_whenDlqDrained() {
         when(dlt.isRunning()).thenReturn(true);
         ListenerContainerIdleEvent event = mock(ListenerContainerIdleEvent.class);
-        when(event.getTopicPartitions())
-                .thenReturn(List.of(new TopicPartition("inventory.reserved-payment.dlq", 0)));
+        when(event.getTopicPartitions()).thenReturn(List.of(new TopicPartition("inventory.reserved-payment.dlq", 0)));
 
         replayer.onDltIdle(event);
 
-        verify(dlt).stop(any(Runnable.class));   // async stop (idle fires on the consumer thread)
+        verify(dlt).stop(any(Runnable.class)); // async stop (idle fires on the consumer thread)
         verify(main, never()).stop(any(Runnable.class));
     }
 
@@ -88,8 +87,7 @@ class PaymentDlqReplayerTest {
     void onDltIdle_ignoresIdleOnNonDlqContainers() {
         when(main.isRunning()).thenReturn(true);
         ListenerContainerIdleEvent event = mock(ListenerContainerIdleEvent.class);
-        when(event.getTopicPartitions())
-                .thenReturn(List.of(new TopicPartition("inventory.reserved", 0)));
+        when(event.getTopicPartitions()).thenReturn(List.of(new TopicPartition("inventory.reserved", 0)));
 
         replayer.onDltIdle(event);
 

@@ -1,8 +1,7 @@
 package com.atlas.payment.client;
 
-import org.springframework.stereotype.Component;
-
 import java.time.Duration;
+import org.springframework.stereotype.Component;
 
 /**
  * Abstracts the backoff wait between provider attempts so unit tests stay deterministic with no real

@@ -34,85 +34,89 @@ import org.springframework.stereotype.Component;
 @Component
 public class PaymentDlqReplayer {
 
-  private static final String DLQ_SUFFIX = ".dlq";
+    private static final String DLQ_SUFFIX = ".dlq";
 
-  private final KafkaListenerEndpointRegistry registry;
-  private final long idleTimeoutMs;
+    private final KafkaListenerEndpointRegistry registry;
+    private final long idleTimeoutMs;
 
-  public PaymentDlqReplayer(
-      KafkaListenerEndpointRegistry registry,
-      @Value("${atlas.payment.dlq.idle-timeout-ms:10000}") long idleTimeoutMs) {
-    this.registry = registry;
-    this.idleTimeoutMs = idleTimeoutMs;
-  }
-
-  /**
-   * Start the stopped DLT container(s) to drain the DLQ. Arms auto-stop (idle detection) so replay
-   * halts itself once the queue is empty. Idempotent — a running container is left running.
-   */
-  public DlqReplayStatus start() {
-    for (MessageListenerContainer container : dltContainers()) {
-      container.getContainerProperties().setIdleEventInterval(idleTimeoutMs);
-      if (!container.isRunning()) {
-        log.warn("DLQ replay: starting DLT container id={} (auto-stop after {}ms idle)",
-            container.getListenerId(), idleTimeoutMs);
-        container.start();
-      }
+    public PaymentDlqReplayer(
+            KafkaListenerEndpointRegistry registry,
+            @Value("${atlas.payment.dlq.idle-timeout-ms:10000}") long idleTimeoutMs) {
+        this.registry = registry;
+        this.idleTimeoutMs = idleTimeoutMs;
     }
-    return status();
-  }
 
-  /** Explicitly stop the DLT container(s) — e.g. to abort a drain. Idempotent. */
-  public DlqReplayStatus stop() {
-    for (MessageListenerContainer container : dltContainers()) {
-      if (container.isRunning()) {
-        log.warn("DLQ replay: stopping DLT container id={}", container.getListenerId());
-        container.stop();
-      }
+    /**
+     * Start the stopped DLT container(s) to drain the DLQ. Arms auto-stop (idle detection) so replay
+     * halts itself once the queue is empty. Idempotent — a running container is left running.
+     */
+    public DlqReplayStatus start() {
+        for (MessageListenerContainer container : dltContainers()) {
+            container.getContainerProperties().setIdleEventInterval(idleTimeoutMs);
+            if (!container.isRunning()) {
+                log.warn(
+                        "DLQ replay: starting DLT container id={} (auto-stop after {}ms idle)",
+                        container.getListenerId(),
+                        idleTimeoutMs);
+                container.start();
+            }
+        }
+        return status();
     }
-    return status();
-  }
 
-  /** Whether replay is currently running, and the DLT container ids under control. */
-  public DlqReplayStatus status() {
-    List<String> ids = new ArrayList<>();
-    boolean anyRunning = false;
-    for (MessageListenerContainer container : dltContainers()) {
-      ids.add(container.getListenerId());
-      anyRunning = anyRunning || container.isRunning();
+    /** Explicitly stop the DLT container(s) — e.g. to abort a drain. Idempotent. */
+    public DlqReplayStatus stop() {
+        for (MessageListenerContainer container : dltContainers()) {
+            if (container.isRunning()) {
+                log.warn("DLQ replay: stopping DLT container id={}", container.getListenerId());
+                container.stop();
+            }
+        }
+        return status();
     }
-    return new DlqReplayStatus(anyRunning, ids);
-  }
 
-  /**
-   * Auto-stop: when a running DLT container has been idle for {@code idleTimeoutMs} (the DLQ is
-   * drained), stop it. Uses the asynchronous {@code stop(Runnable)} because the idle event fires on
-   * the consumer thread — a synchronous stop there would deadlock waiting for that same thread.
-   */
-  @EventListener
-  public void onDltIdle(ListenerContainerIdleEvent event) {
-    boolean dlqIdle = event.getTopicPartitions() != null
-        && event.getTopicPartitions().stream().anyMatch(tp -> tp.topic().endsWith(DLQ_SUFFIX));
-    if (!dlqIdle) {
-      return;
+    /** Whether replay is currently running, and the DLT container ids under control. */
+    public DlqReplayStatus status() {
+        List<String> ids = new ArrayList<>();
+        boolean anyRunning = false;
+        for (MessageListenerContainer container : dltContainers()) {
+            ids.add(container.getListenerId());
+            anyRunning = anyRunning || container.isRunning();
+        }
+        return new DlqReplayStatus(anyRunning, ids);
     }
-    for (MessageListenerContainer container : dltContainers()) {
-      if (container.isRunning()) {
-        log.warn("DLQ replay: DLQ drained (idle {}ms) — auto-stopping DLT container id={}",
-            idleTimeoutMs, container.getListenerId());
-        container.stop(() -> log.info("DLQ replay auto-stopped: id={}", container.getListenerId()));
-      }
-    }
-  }
 
-  private List<MessageListenerContainer> dltContainers() {
-    List<MessageListenerContainer> result = new ArrayList<>();
-    for (MessageListenerContainer container : registry.getListenerContainers()) {
-      String[] topics = container.getContainerProperties().getTopics();
-      if (topics != null && Arrays.stream(topics).anyMatch(topic -> topic.endsWith(DLQ_SUFFIX))) {
-        result.add(container);
-      }
+    /**
+     * Auto-stop: when a running DLT container has been idle for {@code idleTimeoutMs} (the DLQ is
+     * drained), stop it. Uses the asynchronous {@code stop(Runnable)} because the idle event fires on
+     * the consumer thread — a synchronous stop there would deadlock waiting for that same thread.
+     */
+    @EventListener
+    public void onDltIdle(ListenerContainerIdleEvent event) {
+        boolean dlqIdle = event.getTopicPartitions() != null
+                && event.getTopicPartitions().stream().anyMatch(tp -> tp.topic().endsWith(DLQ_SUFFIX));
+        if (!dlqIdle) {
+            return;
+        }
+        for (MessageListenerContainer container : dltContainers()) {
+            if (container.isRunning()) {
+                log.warn(
+                        "DLQ replay: DLQ drained (idle {}ms) — auto-stopping DLT container id={}",
+                        idleTimeoutMs,
+                        container.getListenerId());
+                container.stop(() -> log.info("DLQ replay auto-stopped: id={}", container.getListenerId()));
+            }
+        }
     }
-    return result;
-  }
+
+    private List<MessageListenerContainer> dltContainers() {
+        List<MessageListenerContainer> result = new ArrayList<>();
+        for (MessageListenerContainer container : registry.getListenerContainers()) {
+            String[] topics = container.getContainerProperties().getTopics();
+            if (topics != null && Arrays.stream(topics).anyMatch(topic -> topic.endsWith(DLQ_SUFFIX))) {
+                result.add(container);
+            }
+        }
+        return result;
+    }
 }

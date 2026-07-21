@@ -1,26 +1,5 @@
 package com.atlas.payment.service;
 
-import com.atlas.payment.client.ProviderCallResult;
-import com.atlas.payment.entity.Payment;
-import com.atlas.payment.entity.PaymentStatus;
-import com.atlas.payment.event.PaymentEventPayload;
-import com.atlas.payment.shared.messaging.EventType;
-import com.atlas.payment.messaging.OutboxEventWriter;
-import com.atlas.payment.repository.ConsumedEventRepository;
-import com.atlas.payment.repository.PaymentRepository;
-import com.atlas.payment.support.PaymentTestData;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.Optional;
-
 import static com.atlas.payment.support.PaymentTestData.BOOKING_ID;
 import static com.atlas.payment.support.PaymentTestData.EVENT_ID;
 import static com.atlas.payment.support.PaymentTestData.PAYMENT_ID;
@@ -32,12 +11,37 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.atlas.payment.client.ProviderCallResult;
+import com.atlas.payment.entity.Payment;
+import com.atlas.payment.entity.PaymentStatus;
+import com.atlas.payment.event.PaymentEventPayload;
+import com.atlas.payment.messaging.OutboxEventWriter;
+import com.atlas.payment.repository.ConsumedEventRepository;
+import com.atlas.payment.repository.PaymentRepository;
+import com.atlas.payment.shared.messaging.EventType;
+import com.atlas.payment.support.PaymentTestData;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 @ExtendWith(MockitoExtension.class)
 class PaymentTransactionServiceTest {
 
-    @Mock PaymentRepository paymentRepository;
-    @Mock ConsumedEventRepository consumedEventRepository;
-    @Mock OutboxEventWriter outboxEventWriter;
+    @Mock
+    PaymentRepository paymentRepository;
+
+    @Mock
+    ConsumedEventRepository consumedEventRepository;
+
+    @Mock
+    OutboxEventWriter outboxEventWriter;
 
     // Real registry (not a mock) so the idempotency-skip counters can be asserted (ADR-0020).
     MeterRegistry meterRegistry;
@@ -104,8 +108,7 @@ class PaymentTransactionServiceTest {
         Payment payment = PaymentTestData.processingPayment();
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
 
-        service.resolve(PAYMENT_ID, new ProviderCallResult(List.of(
-                PaymentTestData.successAttempt(1, "txn-789"))));
+        service.resolve(PAYMENT_ID, new ProviderCallResult(List.of(PaymentTestData.successAttempt(1, "txn-789"))));
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(payment.getProviderTransactionId()).isEqualTo("txn-789");
@@ -119,8 +122,8 @@ class PaymentTransactionServiceTest {
         Payment payment = PaymentTestData.processingPayment();
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
 
-        service.resolve(PAYMENT_ID, new ProviderCallResult(List.of(
-                PaymentTestData.declinedAttempt(1, "Insufficient funds"))));
+        service.resolve(
+                PAYMENT_ID, new ProviderCallResult(List.of(PaymentTestData.declinedAttempt(1, "Insufficient funds"))));
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(payment.getReason()).isEqualTo("Insufficient funds");
@@ -133,10 +136,12 @@ class PaymentTransactionServiceTest {
         Payment payment = PaymentTestData.processingPayment();
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
 
-        service.resolve(PAYMENT_ID, new ProviderCallResult(List.of(
-                PaymentTestData.transientAttempt(1),
-                PaymentTestData.transientAttempt(2),
-                PaymentTestData.transientAttempt(3))));
+        service.resolve(
+                PAYMENT_ID,
+                new ProviderCallResult(List.of(
+                        PaymentTestData.transientAttempt(1),
+                        PaymentTestData.transientAttempt(2),
+                        PaymentTestData.transientAttempt(3))));
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(payment.getAttempts()).hasSize(3);
@@ -148,10 +153,12 @@ class PaymentTransactionServiceTest {
         Payment payment = PaymentTestData.processingPayment();
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
 
-        service.resolve(PAYMENT_ID, new ProviderCallResult(List.of(
-                PaymentTestData.timeoutAttempt(1),
-                PaymentTestData.timeoutAttempt(2),
-                PaymentTestData.timeoutAttempt(3))));
+        service.resolve(
+                PAYMENT_ID,
+                new ProviderCallResult(List.of(
+                        PaymentTestData.timeoutAttempt(1),
+                        PaymentTestData.timeoutAttempt(2),
+                        PaymentTestData.timeoutAttempt(3))));
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.TIMED_OUT);
         capturePayload(EventType.PAYMENT_TIMED_OUT);
@@ -163,8 +170,7 @@ class PaymentTransactionServiceTest {
         payment.setStatus(PaymentStatus.SUCCEEDED);
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.of(payment));
 
-        service.resolve(PAYMENT_ID, new ProviderCallResult(List.of(
-                PaymentTestData.successAttempt(1, "txn-1"))));
+        service.resolve(PAYMENT_ID, new ProviderCallResult(List.of(PaymentTestData.successAttempt(1, "txn-1"))));
 
         verify(paymentRepository, never()).save(any());
         verifyNoInteractions(outboxEventWriter);
@@ -174,19 +180,22 @@ class PaymentTransactionServiceTest {
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private InventoryReservedCommand command() {
-        return new InventoryReservedCommand(BOOKING_ID, PaymentTestData.defaultAmount().getAmount(),
-                PaymentTestData.CORRELATION_ID, PaymentTestData.SAGA_ID);
+        return new InventoryReservedCommand(
+                BOOKING_ID,
+                PaymentTestData.defaultAmount().getAmount(),
+                PaymentTestData.CORRELATION_ID,
+                PaymentTestData.SAGA_ID);
     }
 
     private double skipCount(String reason) {
-        return meterRegistry.counter("atlas.payment.events.skipped",
-                "reason", reason, "event", "inventory_reserved").count();
+        return meterRegistry
+                .counter("atlas.payment.events.skipped", "reason", reason, "event", "inventory_reserved")
+                .count();
     }
 
     private PaymentEventPayload capturePayload(EventType expectedEventType) {
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
-        verify(outboxEventWriter).write(eq(BOOKING_ID), eq(expectedEventType),
-                any(), any(), payload.capture());
+        verify(outboxEventWriter).write(eq(BOOKING_ID), eq(expectedEventType), any(), any(), payload.capture());
         assertThat(payload.getValue()).isInstanceOf(PaymentEventPayload.class);
         return (PaymentEventPayload) payload.getValue();
     }

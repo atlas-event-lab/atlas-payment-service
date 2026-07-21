@@ -9,9 +9,4 @@ import java.util.UUID;
  * payment: it provides the {@code bookingId} and the {@code amount} to charge, plus the saga
  * metadata propagated onto produced events.
  */
-public record InventoryReservedCommand(
-        UUID bookingId,
-        BigDecimal amount,
-        String correlationId,
-        String sagaId
-) {}
+public record InventoryReservedCommand(UUID bookingId, BigDecimal amount, String correlationId, String sagaId) {}

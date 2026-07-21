@@ -1,18 +1,17 @@
 package com.atlas.payment.messaging;
 
 import com.atlas.payment.entity.OutboxEvent;
-import com.atlas.payment.repository.OutboxRepository;
 import com.atlas.payment.event.EventEnvelope;
+import com.atlas.payment.repository.OutboxRepository;
 import com.atlas.payment.shared.messaging.EventType;
 import com.atlas.payment.shared.web.CorrelationIdFilter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
-
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * Writes domain events to the Transactional Outbox (EVT-009).
@@ -43,8 +42,7 @@ public class OutboxEventWriter {
      * @param sagaId        saga instance id (OBS-003)
      * @param payload       the business payload (never null, never carries metadata)
      */
-    public void write(UUID aggregateId, EventType eventType,
-                      String correlationId, String sagaId, Object payload) {
+    public void write(UUID aggregateId, EventType eventType, String correlationId, String sagaId, Object payload) {
         var envelope = new EventEnvelope<>(
                 UUID.randomUUID(),
                 eventType.name(),
@@ -56,15 +54,8 @@ public class OutboxEventWriter {
                 PRODUCER,
                 payload);
 
-        outboxRepository.save(
-            new OutboxEvent(
-                UUID.randomUUID(),
-                AGGREGATE_TYPE,
-                aggregateId,
-                eventType,
-                EVENT_VERSION,
-                serialize(envelope))
-        );
+        outboxRepository.save(new OutboxEvent(
+                UUID.randomUUID(), AGGREGATE_TYPE, aggregateId, eventType, EVENT_VERSION, serialize(envelope)));
     }
 
     private String serialize(EventEnvelope<?> envelope) {
@@ -79,6 +70,8 @@ public class OutboxEventWriter {
     /** Reads traceId from MDC (set by {@link CorrelationIdFilter}), falls back to a new UUID. */
     private String resolveTraceId() {
         String traceId = MDC.get(CorrelationIdFilter.TRACE_ID_MDC_KEY);
-        return (traceId != null && !traceId.isBlank()) ? traceId : UUID.randomUUID().toString();
+        return (traceId != null && !traceId.isBlank())
+                ? traceId
+                : UUID.randomUUID().toString();
     }
 }

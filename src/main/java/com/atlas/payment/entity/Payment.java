@@ -13,6 +13,11 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -22,12 +27,6 @@ import lombok.ToString;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Aggregate Root for the Payment domain (services/payment/service.md §Owns).
@@ -61,8 +60,10 @@ public class Payment {
 
     @Embedded
     @AttributeOverrides({
-            @AttributeOverride(name = "amount",   column = @Column(name = "amount",   nullable = false, precision = 19, scale = 2)),
-            @AttributeOverride(name = "currency", column = @Column(name = "currency", nullable = false, length = 3))
+        @AttributeOverride(
+                name = "amount",
+                column = @Column(name = "amount", nullable = false, precision = 19, scale = 2)),
+        @AttributeOverride(name = "currency", column = @Column(name = "currency", nullable = false, length = 3))
     })
     private Money amount;
 
@@ -113,8 +114,6 @@ public class Payment {
 
     /** True once the payment has reached a terminal state (SUCCEEDED / FAILED / TIMED_OUT). */
     public boolean isTerminal() {
-        return status == PaymentStatus.SUCCEEDED
-                || status == PaymentStatus.FAILED
-                || status == PaymentStatus.TIMED_OUT;
+        return status == PaymentStatus.SUCCEEDED || status == PaymentStatus.FAILED || status == PaymentStatus.TIMED_OUT;
     }
 }

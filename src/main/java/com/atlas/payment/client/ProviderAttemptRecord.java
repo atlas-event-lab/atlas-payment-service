@@ -1,7 +1,6 @@
 package com.atlas.payment.client;
 
 import com.atlas.payment.entity.AttemptOutcome;
-
 import java.time.Instant;
 
 /**
@@ -14,5 +13,4 @@ public record ProviderAttemptRecord(
         Instant startedAt,
         Instant completedAt,
         String errorDetail,
-        ProviderResponseRecord response
-) {}
+        ProviderResponseRecord response) {}

@@ -1,23 +1,5 @@
 package com.atlas.payment.messaging;
 
-import com.atlas.payment.event.EventValidator;
-import com.atlas.payment.event.InventoryReservedPayload;
-import com.atlas.payment.exception.InvalidPaymentStateTransitionException;
-import com.atlas.payment.service.InventoryReservedCommand;
-import com.atlas.payment.service.PaymentService;
-import com.atlas.payment.event.EventEnvelope;
-import com.atlas.payment.support.PaymentTestData;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Validation;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.UUID;
-
 import static com.atlas.payment.support.PaymentTestData.BOOKING_ID;
 import static com.atlas.payment.support.PaymentTestData.EVENT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +9,23 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+
+import com.atlas.payment.event.EventEnvelope;
+import com.atlas.payment.event.EventValidator;
+import com.atlas.payment.event.InventoryReservedPayload;
+import com.atlas.payment.exception.InvalidPaymentStateTransitionException;
+import com.atlas.payment.service.InventoryReservedCommand;
+import com.atlas.payment.service.PaymentService;
+import com.atlas.payment.support.PaymentTestData;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class PaymentEventConsumerTest {
 
@@ -51,19 +50,21 @@ class PaymentEventConsumerTest {
     }
 
     private double parked(String reason) {
-        return meterRegistry.counter("atlas.payment.dlq.parked",
-                "reason", reason, "event", "inventory_reserved").count();
+        return meterRegistry
+                .counter("atlas.payment.dlq.parked", "reason", reason, "event", "inventory_reserved")
+                .count();
     }
 
     private double replayed(String outcome) {
-        return meterRegistry.counter("atlas.payment.dlq.replayed",
-                "outcome", outcome, "event", "inventory_reserved").count();
+        return meterRegistry
+                .counter("atlas.payment.dlq.replayed", "outcome", outcome, "event", "inventory_reserved")
+                .count();
     }
 
     @Test
     void onInventoryReserved_extracts_total_and_saga_metadata() {
-        EventEnvelope<InventoryReservedPayload> env = envelope(EVENT_ID,
-                new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
+        EventEnvelope<InventoryReservedPayload> env =
+                envelope(EVENT_ID, new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
 
         consumer.onInventoryReserved(env);
 
@@ -78,8 +79,8 @@ class PaymentEventConsumerTest {
 
     @Test
     void onInventoryReserved_missing_total_is_rejected() {
-        EventEnvelope<InventoryReservedPayload> env = envelope(EVENT_ID,
-                new InventoryReservedPayload(BOOKING_ID, null));
+        EventEnvelope<InventoryReservedPayload> env =
+                envelope(EVENT_ID, new InventoryReservedPayload(BOOKING_ID, null));
 
         assertThatThrownBy(() -> consumer.onInventoryReserved(env))
                 .isInstanceOf(ConstraintViolationException.class)
@@ -88,8 +89,8 @@ class PaymentEventConsumerTest {
 
     @Test
     void onInventoryReserved_missing_eventId_is_rejected() {
-        EventEnvelope<InventoryReservedPayload> env = envelope(null,
-                new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
+        EventEnvelope<InventoryReservedPayload> env =
+                envelope(null, new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
 
         assertThatThrownBy(() -> consumer.onInventoryReserved(env))
                 .isInstanceOf(ConstraintViolationException.class)
@@ -100,8 +101,8 @@ class PaymentEventConsumerTest {
 
     @Test
     void dlt_retriesExhausted_isRedrivenThroughTheNormalPath() {
-        EventEnvelope<InventoryReservedPayload> env = envelope(EVENT_ID,
-                new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
+        EventEnvelope<InventoryReservedPayload> env =
+                envelope(EVENT_ID, new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
 
         // A retryable failure that exhausted the ladder — any exception outside the exclude set.
         consumer.onInventoryReservedDlt(env, "org.springframework.dao.QueryTimeoutException");
@@ -116,8 +117,8 @@ class PaymentEventConsumerTest {
 
     @Test
     void dlt_validationPoison_isQuarantinedNotReprocessed() {
-        EventEnvelope<InventoryReservedPayload> env = envelope(EVENT_ID,
-                new InventoryReservedPayload(BOOKING_ID, null)); // malformed
+        EventEnvelope<InventoryReservedPayload> env =
+                envelope(EVENT_ID, new InventoryReservedPayload(BOOKING_ID, null)); // malformed
 
         consumer.onInventoryReservedDlt(env, ConstraintViolationException.class.getName());
 
@@ -129,8 +130,8 @@ class PaymentEventConsumerTest {
 
     @Test
     void dlt_forbiddenTransitionPoison_isQuarantined() {
-        EventEnvelope<InventoryReservedPayload> env = envelope(EVENT_ID,
-                new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
+        EventEnvelope<InventoryReservedPayload> env =
+                envelope(EVENT_ID, new InventoryReservedPayload(BOOKING_ID, new BigDecimal("800.00")));
 
         consumer.onInventoryReservedDlt(env, InvalidPaymentStateTransitionException.class.getName());
 

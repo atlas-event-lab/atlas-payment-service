@@ -6,12 +6,11 @@ import com.atlas.payment.entity.Payment;
 import com.atlas.payment.entity.PaymentStatus;
 import com.atlas.payment.repository.PaymentRepository;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Orchestrates a payment without holding a database transaction open across the provider call
@@ -54,19 +53,26 @@ public class PaymentServiceImpl implements PaymentService {
             return;
         }
         Payment payment = found.get();
-        log.warn("Recovering stale PROCESSING payment: paymentId={}, bookingId={}",
-                payment.getPaymentId(), payment.getBookingId());
+        log.warn(
+                "Recovering stale PROCESSING payment: paymentId={}, bookingId={}",
+                payment.getPaymentId(),
+                payment.getBookingId());
 
         ProviderCallResult result = chargeAndResolve(payment);
-        meterRegistry.counter(M_RECOVERIES,
-                "outcome", result.finalOutcome().name().toLowerCase()).increment();
+        meterRegistry
+                .counter(M_RECOVERIES, "outcome", result.finalOutcome().name().toLowerCase())
+                .increment();
     }
 
     /** The shared post-TX1 path: provider call (outside any transaction), then TX2 resolve. */
     private ProviderCallResult chargeAndResolve(Payment payment) {
         ProviderCallResult result = providerClient.charge(payment);
-        meterRegistry.counter(M_PROVIDER_CALLS,
-                "outcome", result.finalOutcome().name().toLowerCase()).increment();
+        meterRegistry
+                .counter(
+                        M_PROVIDER_CALLS,
+                        "outcome",
+                        result.finalOutcome().name().toLowerCase())
+                .increment();
 
         transactionService.resolve(payment.getPaymentId(), result);
         return result;

@@ -1,9 +1,8 @@
 package com.atlas.payment.client;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import java.time.Duration;
 import java.util.List;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Externalized configuration for the Fake Payment Provider call (services/payment/service.md
@@ -20,12 +19,7 @@ import java.util.List;
  */
 @ConfigurationProperties(prefix = "atlas.payment.provider")
 public record PaymentProviderProperties(
-        String baseUrl,
-        Duration timeout,
-        int maxAttempts,
-        List<Duration> backoff,
-        String scenario
-) {
+        String baseUrl, Duration timeout, int maxAttempts, List<Duration> backoff, String scenario) {
     /** Wait to apply before the given 1-based attempt; no wait once past the configured list. */
     public Duration backoffBefore(int attemptNumber) {
         int index = attemptNumber - 1;

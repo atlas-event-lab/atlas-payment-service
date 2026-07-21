@@ -2,11 +2,10 @@ package com.atlas.payment.config;
 
 import com.atlas.payment.client.PaymentProviderProperties;
 import feign.Request;
+import java.util.concurrent.TimeUnit;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * Wires the Fake Payment Provider Feign client. Binds {@link PaymentProviderProperties} and exposes
@@ -21,9 +20,6 @@ public class PaymentProviderConfig {
     @Bean
     public Request.Options paymentProviderRequestOptions(PaymentProviderProperties properties) {
         long timeoutMillis = properties.timeout().toMillis();
-        return new Request.Options(
-                timeoutMillis, TimeUnit.MILLISECONDS,
-                timeoutMillis, TimeUnit.MILLISECONDS,
-                true);
+        return new Request.Options(timeoutMillis, TimeUnit.MILLISECONDS, timeoutMillis, TimeUnit.MILLISECONDS, true);
     }
 }

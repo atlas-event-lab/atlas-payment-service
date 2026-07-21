@@ -1,7 +1,6 @@
 package com.atlas.payment.client;
 
 import com.atlas.payment.entity.AttemptOutcome;
-
 import java.util.List;
 
 /**

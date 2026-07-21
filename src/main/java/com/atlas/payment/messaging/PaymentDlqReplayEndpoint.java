@@ -27,20 +27,20 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PaymentDlqReplayEndpoint {
 
-  private final PaymentDlqReplayer replayer;
+    private final PaymentDlqReplayer replayer;
 
-  @ReadOperation
-  public DlqReplayStatus status() {
-    return replayer.status();
-  }
+    @ReadOperation
+    public DlqReplayStatus status() {
+        return replayer.status();
+    }
 
-  @WriteOperation
-  public DlqReplayStatus control(@Nullable String action) {
-    String normalized = action == null ? "start" : action.trim().toLowerCase(Locale.ROOT);
-    return switch (normalized) {
-      case "start" -> replayer.start();
-      case "stop" -> replayer.stop();
-      default -> throw new IllegalArgumentException("action must be 'start' or 'stop', got: " + action);
-    };
-  }
+    @WriteOperation
+    public DlqReplayStatus control(@Nullable String action) {
+        String normalized = action == null ? "start" : action.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "start" -> replayer.start();
+            case "stop" -> replayer.stop();
+            default -> throw new IllegalArgumentException("action must be 'start' or 'stop', got: " + action);
+        };
+    }
 }

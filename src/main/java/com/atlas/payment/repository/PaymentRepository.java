@@ -2,12 +2,11 @@ package com.atlas.payment.repository;
 
 import com.atlas.payment.entity.Payment;
 import com.atlas.payment.entity.PaymentStatus;
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
  * Repository for the {@link Payment} aggregate. Accesses only local entities (DB-004);
@@ -18,6 +17,5 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByBookingId(UUID bookingId);
 
     /** Oldest-first batch of stale payments for the recovery sweep (ADR-0021). */
-    List<Payment> findTop100ByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
-            PaymentStatus status, Instant updatedBefore);
+    List<Payment> findTop100ByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(PaymentStatus status, Instant updatedBefore);
 }

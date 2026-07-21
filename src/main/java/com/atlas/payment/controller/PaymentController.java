@@ -2,14 +2,13 @@ package com.atlas.payment.controller;
 
 import com.atlas.payment.dto.PaymentResponse;
 import com.atlas.payment.service.PaymentQueryService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.UUID;
 
 /**
  * Read-only Payment API (payment.yaml; OpenAPI server {@code /api/v1}). Requires a valid Keycloak

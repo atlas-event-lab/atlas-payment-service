@@ -1,32 +1,33 @@
 package com.atlas.payment.service;
 
-import com.atlas.payment.dto.PaymentResponse;
-import com.atlas.payment.entity.Payment;
-import com.atlas.payment.entity.PaymentStatus;
-import com.atlas.payment.exception.PaymentNotFoundException;
-import com.atlas.payment.repository.PaymentRepository;
-import com.atlas.payment.support.PaymentTestData;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.math.BigDecimal;
-import java.util.Optional;
-
 import static com.atlas.payment.support.PaymentTestData.BOOKING_ID;
 import static com.atlas.payment.support.PaymentTestData.PAYMENT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import com.atlas.payment.dto.PaymentResponse;
+import com.atlas.payment.entity.Payment;
+import com.atlas.payment.entity.PaymentStatus;
+import com.atlas.payment.exception.PaymentNotFoundException;
+import com.atlas.payment.repository.PaymentRepository;
+import com.atlas.payment.support.PaymentTestData;
+import java.math.BigDecimal;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 @ExtendWith(MockitoExtension.class)
 class PaymentQueryServiceImplTest {
 
-    @Mock PaymentRepository paymentRepository;
+    @Mock
+    PaymentRepository paymentRepository;
 
-    @InjectMocks PaymentQueryServiceImpl service;
+    @InjectMocks
+    PaymentQueryServiceImpl service;
 
     @Test
     void getPayment_maps_aggregate_to_contract_response() {
@@ -46,7 +47,6 @@ class PaymentQueryServiceImplTest {
     void getPayment_throws_when_not_found() {
         when(paymentRepository.findById(PAYMENT_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getPayment(PAYMENT_ID))
-                .isInstanceOf(PaymentNotFoundException.class);
+        assertThatThrownBy(() -> service.getPayment(PAYMENT_ID)).isInstanceOf(PaymentNotFoundException.class);
     }
 }

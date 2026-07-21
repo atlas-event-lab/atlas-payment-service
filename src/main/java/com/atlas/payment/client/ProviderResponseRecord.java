@@ -7,9 +7,4 @@ import java.time.Instant;
  * {@link ProviderAttemptRecord}) when the call timed out with no response.
  */
 public record ProviderResponseRecord(
-        int httpStatus,
-        String providerStatus,
-        String transactionId,
-        String reason,
-        Instant receivedAt
-) {}
+        int httpStatus, String providerStatus, String transactionId, String reason, Instant receivedAt) {}

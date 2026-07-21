@@ -17,13 +17,12 @@ import com.atlas.payment.repository.PaymentRepository;
 import com.atlas.payment.shared.messaging.ConsumerEventType;
 import com.atlas.payment.shared.messaging.EventType;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * The two transactional units of work of a payment (services/payment/service.md,
@@ -61,8 +60,7 @@ public class PaymentTransactionService {
     public Optional<Payment> beginProcessing(UUID eventId, InventoryReservedCommand command) {
         if (consumedEventRepository.existsById(eventId)) {
             recordSkip(SKIP_DUPLICATE);
-            log.info("Skipping duplicate InventoryReserved: eventId={}, bookingId={}",
-                    eventId, command.bookingId());
+            log.info("Skipping duplicate InventoryReserved: eventId={}, bookingId={}", eventId, command.bookingId());
             return Optional.empty();
         }
 
@@ -72,18 +70,19 @@ public class PaymentTransactionService {
             // Record the event as consumed and do not charge again (EVT-008).
             consumedEventRepository.save(new ConsumedEvent(eventId, ConsumerEventType.INVENTORY_RESERVED));
             recordSkip(SKIP_ALREADY_CHARGED);
-            log.info("Payment already exists for booking, not charging again: bookingId={}, paymentId={}",
-                    command.bookingId(), existing.get().getPaymentId());
+            log.info(
+                    "Payment already exists for booking, not charging again: bookingId={}, paymentId={}",
+                    command.bookingId(),
+                    existing.get().getPaymentId());
             return Optional.empty();
         }
 
         Payment payment = new Payment(
-            UUID.randomUUID(),
-            command.bookingId(),
-            new Money(command.amount(), "USD"),
-            command.correlationId(),
-            command.sagaId()
-        );
+                UUID.randomUUID(),
+                command.bookingId(),
+                new Money(command.amount(), "USD"),
+                command.correlationId(),
+                command.sagaId());
 
         PaymentStateTransitionGuard.assertAllowed(payment.getStatus(), PaymentStatus.PROCESSING);
         payment.setStatus(PaymentStatus.PROCESSING);
@@ -92,15 +91,16 @@ public class PaymentTransactionService {
         consumedEventRepository.save(new ConsumedEvent(eventId, ConsumerEventType.INVENTORY_RESERVED));
 
         outboxEventWriter.write(
-            payment.getBookingId(),
-            EventType.PAYMENT_REQUESTED,
-            command.correlationId(),
-            command.sagaId(),
-            payloadOf(payment, PaymentStatus.PROCESSING, null)
-        );
+                payment.getBookingId(),
+                EventType.PAYMENT_REQUESTED,
+                command.correlationId(),
+                command.sagaId(),
+                payloadOf(payment, PaymentStatus.PROCESSING, null));
 
-        log.info("Payment processing started: paymentId={}, bookingId={}",
-                payment.getPaymentId(), payment.getBookingId());
+        log.info(
+                "Payment processing started: paymentId={}, bookingId={}",
+                payment.getPaymentId(),
+                payment.getBookingId());
         return Optional.of(payment);
     }
 
@@ -110,13 +110,16 @@ public class PaymentTransactionService {
      */
     @Transactional
     public void resolve(UUID paymentId, ProviderCallResult result) {
-        Payment payment = paymentRepository.findById(paymentId)
+        Payment payment = paymentRepository
+                .findById(paymentId)
                 .orElseThrow(() -> new IllegalStateException("Payment vanished mid-flight: " + paymentId));
 
         if (payment.isTerminal()) {
             recordSkip(SKIP_ALREADY_RESOLVED);
-            log.info("Payment already resolved, ignoring duplicate outcome: paymentId={}, status={}",
-                    paymentId, payment.getStatus());
+            log.info(
+                    "Payment already resolved, ignoring duplicate outcome: paymentId={}, status={}",
+                    paymentId,
+                    payment.getStatus());
             return;
         }
 
@@ -130,17 +133,18 @@ public class PaymentTransactionService {
         paymentRepository.save(payment);
 
         outboxEventWriter.write(
-            payment.getBookingId(),
-            terminal.eventType(),
-            payment.getCorrelationId(),
-            payment.getSagaId(),
-            payloadOf(payment,
-                terminal.status(),
-                terminal.reason())
-        );
+                payment.getBookingId(),
+                terminal.eventType(),
+                payment.getCorrelationId(),
+                payment.getSagaId(),
+                payloadOf(payment, terminal.status(), terminal.reason()));
 
-        log.info("Payment resolved: paymentId={}, bookingId={}, status={}, attempts={}",
-                paymentId, payment.getBookingId(), terminal.status(), result.attempts().size());
+        log.info(
+                "Payment resolved: paymentId={}, bookingId={}, status={}, attempts={}",
+                paymentId,
+                payment.getBookingId(),
+                terminal.status(),
+                result.attempts().size());
     }
 
     /** Maps the final provider outcome to the terminal state, event type and denormalized fields. */
@@ -148,14 +152,22 @@ public class PaymentTransactionService {
         ProviderAttemptRecord last = result.finalAttempt();
         int attempts = result.attempts().size();
         return switch (result.finalOutcome()) {
-            case SUCCESS -> new Terminal(PaymentStatus.SUCCEEDED, EventType.PAYMENT_SUCCEEDED,
-                    null, last.response() == null ? null : last.response().transactionId());
-            case DECLINED -> new Terminal(PaymentStatus.FAILED, EventType.PAYMENT_FAILED,
-                    declineReason(last), null);
-            case TRANSIENT_ERROR -> new Terminal(PaymentStatus.FAILED, EventType.PAYMENT_FAILED,
-                    "Provider unavailable after " + attempts + " attempt(s)", null);
-            case TIMEOUT -> new Terminal(PaymentStatus.TIMED_OUT, EventType.PAYMENT_TIMED_OUT,
-                    "Provider did not respond after " + attempts + " attempt(s)", null);
+            case SUCCESS -> new Terminal(
+                    PaymentStatus.SUCCEEDED,
+                    EventType.PAYMENT_SUCCEEDED,
+                    null,
+                    last.response() == null ? null : last.response().transactionId());
+            case DECLINED -> new Terminal(PaymentStatus.FAILED, EventType.PAYMENT_FAILED, declineReason(last), null);
+            case TRANSIENT_ERROR -> new Terminal(
+                    PaymentStatus.FAILED,
+                    EventType.PAYMENT_FAILED,
+                    "Provider unavailable after " + attempts + " attempt(s)",
+                    null);
+            case TIMEOUT -> new Terminal(
+                    PaymentStatus.TIMED_OUT,
+                    EventType.PAYMENT_TIMED_OUT,
+                    "Provider did not respond after " + attempts + " attempt(s)",
+                    null);
         };
     }
 
@@ -167,20 +179,35 @@ public class PaymentTransactionService {
     }
 
     private PaymentAttempt toAttempt(ProviderAttemptRecord record) {
-        PaymentAttempt attempt = new PaymentAttempt(UUID.randomUUID(), record.attemptNumber(),
-                record.outcome(), record.startedAt(), record.completedAt(), record.errorDetail());
+        PaymentAttempt attempt = new PaymentAttempt(
+                UUID.randomUUID(),
+                record.attemptNumber(),
+                record.outcome(),
+                record.startedAt(),
+                record.completedAt(),
+                record.errorDetail());
         ProviderResponseRecord response = record.response();
         if (response != null) {
-            attempt.attachResponse(new PaymentProviderResponse(UUID.randomUUID(), response.httpStatus(),
-                    response.providerStatus(), response.transactionId(), response.reason(),
+            attempt.attachResponse(new PaymentProviderResponse(
+                    UUID.randomUUID(),
+                    response.httpStatus(),
+                    response.providerStatus(),
+                    response.transactionId(),
+                    response.reason(),
                     response.receivedAt()));
         }
         return attempt;
     }
 
     private void recordSkip(String reason) {
-        meterRegistry.counter(M_SKIPPED, "reason", reason,
-                "event", ConsumerEventType.INVENTORY_RESERVED.name().toLowerCase()).increment();
+        meterRegistry
+                .counter(
+                        M_SKIPPED,
+                        "reason",
+                        reason,
+                        "event",
+                        ConsumerEventType.INVENTORY_RESERVED.name().toLowerCase())
+                .increment();
     }
 
     private PaymentEventPayload payloadOf(Payment payment, PaymentStatus status, String reason) {

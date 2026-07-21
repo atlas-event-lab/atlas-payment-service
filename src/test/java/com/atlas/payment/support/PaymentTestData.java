@@ -6,7 +6,6 @@ import com.atlas.payment.entity.AttemptOutcome;
 import com.atlas.payment.entity.Money;
 import com.atlas.payment.entity.Payment;
 import com.atlas.payment.entity.PaymentStatus;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -41,17 +40,32 @@ public final class PaymentTestData {
     }
 
     public static ProviderAttemptRecord successAttempt(int n, String transactionId) {
-        return new ProviderAttemptRecord(n, AttemptOutcome.SUCCESS, T0, T1, null,
+        return new ProviderAttemptRecord(
+                n,
+                AttemptOutcome.SUCCESS,
+                T0,
+                T1,
+                null,
                 new ProviderResponseRecord(200, "APPROVED", transactionId, null, T1));
     }
 
     public static ProviderAttemptRecord declinedAttempt(int n, String reason) {
-        return new ProviderAttemptRecord(n, AttemptOutcome.DECLINED, T0, T1, "Provider HTTP 402",
+        return new ProviderAttemptRecord(
+                n,
+                AttemptOutcome.DECLINED,
+                T0,
+                T1,
+                "Provider HTTP 402",
                 new ProviderResponseRecord(402, "DECLINED", null, reason, T1));
     }
 
     public static ProviderAttemptRecord transientAttempt(int n) {
-        return new ProviderAttemptRecord(n, AttemptOutcome.TRANSIENT_ERROR, T0, T1, "Provider HTTP 503",
+        return new ProviderAttemptRecord(
+                n,
+                AttemptOutcome.TRANSIENT_ERROR,
+                T0,
+                T1,
+                "Provider HTTP 503",
                 new ProviderResponseRecord(503, "UNAVAILABLE", null, null, T1));
     }
 

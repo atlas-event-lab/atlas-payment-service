@@ -11,8 +11,4 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param reason        optional human-readable cause (present on DECLINED).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record ProviderChargeResponse(
-        String transactionId,
-        String status,
-        String reason
-) {}
+public record ProviderChargeResponse(String transactionId, String status, String reason) {}

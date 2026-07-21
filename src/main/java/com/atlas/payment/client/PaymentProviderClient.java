@@ -9,16 +9,15 @@ import com.atlas.payment.entity.Payment;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import feign.FeignException;
 import feign.RetryableException;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
-
 import java.net.SocketTimeoutException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 
 /**
  * Calls the Fake Payment Provider, applying the timeout/retry policy from
@@ -40,11 +39,12 @@ public class PaymentProviderClient {
     private final Clock clock;
     private final ObjectMapper objectMapper;
 
-    public PaymentProviderClient(PaymentProviderFeignClient providerClient,
-                                 PaymentProviderProperties properties,
-                                 Sleeper sleeper,
-                                 Clock clock,
-                                 ObjectMapper objectMapper) {
+    public PaymentProviderClient(
+            PaymentProviderFeignClient providerClient,
+            PaymentProviderProperties properties,
+            Sleeper sleeper,
+            Clock clock,
+            ObjectMapper objectMapper) {
         this.providerClient = providerClient;
         this.properties = properties;
         this.sleeper = sleeper;
@@ -71,8 +71,13 @@ public class PaymentProviderClient {
             if (isResolved(record.outcome())) {
                 break; // SUCCESS or DECLINED — never retried
             }
-            log.warn("Transient provider outcome, will retry if attempts remain: paymentId={}, attempt={}/{}, outcome={}",
-                    payment.getPaymentId(), attempt, properties.maxAttempts(), record.outcome());
+            log.warn(
+                    "Transient provider outcome, will retry if attempts remain: "
+                            + "paymentId={}, attempt={}/{}, outcome={}",
+                    payment.getPaymentId(),
+                    attempt,
+                    properties.maxAttempts(),
+                    record.outcome());
         }
 
         return new ProviderCallResult(List.copyOf(attempts));
@@ -92,10 +97,13 @@ public class PaymentProviderClient {
             // TIMEOUT outcome, any other I/O is transient (mirrors the prior ResourceAccessException path).
             boolean timedOut = e.getCause() instanceof SocketTimeoutException;
             AttemptOutcome outcome = timedOut ? AttemptOutcome.TIMEOUT : AttemptOutcome.TRANSIENT_ERROR;
-            log.warn("Provider call I/O failure: paymentId={}, attempt={}, timedOut={}, cause={}",
-                    payment.getPaymentId(), attemptNumber, timedOut, e.getMessage());
-            return new ProviderAttemptRecord(attemptNumber, outcome, started, clock.instant(),
-                    e.getMessage(), null);
+            log.warn(
+                    "Provider call I/O failure: paymentId={}, attempt={}, timedOut={}, cause={}",
+                    payment.getPaymentId(),
+                    attemptNumber,
+                    timedOut,
+                    e.getMessage());
+            return new ProviderAttemptRecord(attemptNumber, outcome, started, clock.instant(), e.getMessage(), null);
         } catch (FeignException e) {
             // Non-2xx HTTP response: the status (and any error body) ride on the exception. 402/422
             // map to DECLINED (never retried); 503 and other statuses are transient and retried.
@@ -114,9 +122,10 @@ public class PaymentProviderClient {
                 body == null ? null : body.transactionId(),
                 body == null ? null : body.reason(),
                 clock.instant());
-        String errorDetail = (outcome == AttemptOutcome.SUCCESS) ? null
+        String errorDetail = (outcome == AttemptOutcome.SUCCESS)
+                ? null
                 : "Provider HTTP " + http.status()
-                  + (body != null && body.reason() != null ? ": " + body.reason() : "");
+                        + (body != null && body.reason() != null ? ": " + body.reason() : "");
         return new ProviderAttemptRecord(attemptNumber, outcome, started, clock.instant(), errorDetail, response);
     }
 
@@ -174,9 +183,7 @@ public class PaymentProviderClient {
     private ProviderChargeRequest toRequest(Payment payment) {
         Money amount = payment.getAmount();
         return new ProviderChargeRequest(
-                payment.getPaymentId(),
-                payment.getBookingId(),
-                new MoneyDto(amount.getAmount(), amount.getCurrency()));
+                payment.getPaymentId(), payment.getBookingId(), new MoneyDto(amount.getAmount(), amount.getCurrency()));
     }
 
     /** Internal holder for one HTTP exchange (status + parsed body, body may be null). */

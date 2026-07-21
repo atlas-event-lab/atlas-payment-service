@@ -7,14 +7,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * The provider's response captured for a {@link PaymentAttempt} (services/payment/service.md
@@ -54,8 +53,8 @@ public class PaymentProviderResponse {
     @Column(name = "received_at", nullable = false, updatable = false)
     private Instant receivedAt;
 
-    public PaymentProviderResponse(UUID id, int httpStatus, String providerStatus,
-                                   String transactionId, String reason, Instant receivedAt) {
+    public PaymentProviderResponse(
+            UUID id, int httpStatus, String providerStatus, String transactionId, String reason, Instant receivedAt) {
         this.id = id;
         this.httpStatus = httpStatus;
         this.providerStatus = providerStatus;

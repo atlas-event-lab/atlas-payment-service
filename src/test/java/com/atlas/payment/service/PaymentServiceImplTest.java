@@ -1,22 +1,5 @@
 package com.atlas.payment.service;
 
-import com.atlas.payment.client.PaymentProviderClient;
-import com.atlas.payment.client.ProviderCallResult;
-import com.atlas.payment.entity.Payment;
-import com.atlas.payment.entity.PaymentStatus;
-import com.atlas.payment.repository.PaymentRepository;
-import com.atlas.payment.support.PaymentTestData;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-import java.util.Optional;
-
 import static com.atlas.payment.support.PaymentTestData.EVENT_ID;
 import static com.atlas.payment.support.PaymentTestData.PAYMENT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,12 +10,33 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.atlas.payment.client.PaymentProviderClient;
+import com.atlas.payment.client.ProviderCallResult;
+import com.atlas.payment.entity.Payment;
+import com.atlas.payment.entity.PaymentStatus;
+import com.atlas.payment.repository.PaymentRepository;
+import com.atlas.payment.support.PaymentTestData;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceImplTest {
 
-    @Mock PaymentTransactionService transactionService;
-    @Mock PaymentProviderClient providerClient;
-    @Mock PaymentRepository paymentRepository;
+    @Mock
+    PaymentTransactionService transactionService;
+
+    @Mock
+    PaymentProviderClient providerClient;
+
+    @Mock
+    PaymentRepository paymentRepository;
 
     // Real registry (not a mock) so the provider-call / recovery counters can be asserted
     // (ADR-0020 / ADR-0021).
@@ -42,8 +46,7 @@ class PaymentServiceImplTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        service = new PaymentServiceImpl(
-                transactionService, providerClient, paymentRepository, meterRegistry);
+        service = new PaymentServiceImpl(transactionService, providerClient, paymentRepository, meterRegistry);
     }
 
     // ── onInventoryReserved ───────────────────────────────────────────────────
@@ -135,16 +138,22 @@ class PaymentServiceImplTest {
     }
 
     private InventoryReservedCommand command() {
-        return new InventoryReservedCommand(PaymentTestData.BOOKING_ID,
+        return new InventoryReservedCommand(
+                PaymentTestData.BOOKING_ID,
                 PaymentTestData.defaultAmount().getAmount(),
-                PaymentTestData.CORRELATION_ID, PaymentTestData.SAGA_ID);
+                PaymentTestData.CORRELATION_ID,
+                PaymentTestData.SAGA_ID);
     }
 
     private double providerCalls(String outcome) {
-        return meterRegistry.counter("atlas.payment.provider.calls", "outcome", outcome).count();
+        return meterRegistry
+                .counter("atlas.payment.provider.calls", "outcome", outcome)
+                .count();
     }
 
     private double recoveries(String outcome) {
-        return meterRegistry.counter("atlas.payment.recoveries", "outcome", outcome).count();
+        return meterRegistry
+                .counter("atlas.payment.recoveries", "outcome", outcome)
+                .count();
     }
 }

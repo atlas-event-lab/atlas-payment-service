@@ -9,10 +9,10 @@ package com.atlas.payment.shared.messaging;
 public final class EventTopics {
 
     // ── Payment Service produces (payment-events.yaml) ──
-    public static final String PAYMENT_REQUESTED  = "payment.requested";
-    public static final String PAYMENT_SUCCEEDED  = "payment.succeeded";
-    public static final String PAYMENT_FAILED     = "payment.failed";
-    public static final String PAYMENT_TIMED_OUT  = "payment.timed_out";
+    public static final String PAYMENT_REQUESTED = "payment.requested";
+    public static final String PAYMENT_SUCCEEDED = "payment.succeeded";
+    public static final String PAYMENT_FAILED = "payment.failed";
+    public static final String PAYMENT_TIMED_OUT = "payment.timed_out";
 
     // ── Payment Service consumes (owned by Inventory Service) ──
     // Single trigger: carries bookingId + amount (service.md §Trigger & Amount Source).

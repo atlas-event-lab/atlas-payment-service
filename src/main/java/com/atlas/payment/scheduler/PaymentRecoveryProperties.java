@@ -1,8 +1,7 @@
 package com.atlas.payment.scheduler;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import java.time.Duration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Externalized configuration for the stale-PROCESSING payment recovery sweep (ADR-0021;
@@ -19,6 +18,4 @@ import java.time.Duration;
  * reservation TTL sweep).
  */
 @ConfigurationProperties(prefix = "atlas.payment.recovery")
-public record PaymentRecoveryProperties(
-        Duration staleAfter
-) {}
+public record PaymentRecoveryProperties(Duration staleAfter) {}

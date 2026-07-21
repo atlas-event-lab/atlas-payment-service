@@ -4,14 +4,13 @@ import com.atlas.payment.entity.Payment;
 import com.atlas.payment.entity.PaymentStatus;
 import com.atlas.payment.repository.PaymentRepository;
 import com.atlas.payment.service.PaymentService;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.util.List;
 
 /**
  * Safety-net sweeper that re-drives payments stuck in {@code PROCESSING} (ADR-0021).
@@ -43,8 +42,8 @@ public class PaymentRecoveryScheduler {
     @Scheduled(fixedDelayString = "${atlas.payment.recovery.sweep-interval-ms:60000}")
     public void recoverStalePayments() {
         Instant cutoff = clock.instant().minus(properties.staleAfter());
-        List<Payment> stale = paymentRepository
-                .findTop100ByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(PaymentStatus.PROCESSING, cutoff);
+        List<Payment> stale = paymentRepository.findTop100ByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
+                PaymentStatus.PROCESSING, cutoff);
         if (stale.isEmpty()) {
             return;
         }

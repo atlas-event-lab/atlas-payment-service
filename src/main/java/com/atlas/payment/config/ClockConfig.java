@@ -1,9 +1,8 @@
 package com.atlas.payment.config;
 
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.time.Clock;
 
 /**
  * Exposes a {@link Clock} bean so time-dependent logic (timestamps, deadlines) is deterministic

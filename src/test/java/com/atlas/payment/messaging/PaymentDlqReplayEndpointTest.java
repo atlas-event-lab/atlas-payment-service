@@ -1,11 +1,11 @@
 package com.atlas.payment.messaging;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+
+import org.junit.jupiter.api.Test;
 
 class PaymentDlqReplayEndpointTest {
 
@@ -26,7 +26,7 @@ class PaymentDlqReplayEndpointTest {
 
     @Test
     void control_stop_delegatesToStop() {
-        endpoint.control("STOP");   // case-insensitive
+        endpoint.control("STOP"); // case-insensitive
         verify(replayer).stop();
     }
 

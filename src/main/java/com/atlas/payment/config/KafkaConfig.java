@@ -27,8 +27,23 @@ public class KafkaConfig {
         return TopicBuilder.name(name).partitions(3).replicas(1).build();
     }
 
-    @Bean NewTopic paymentRequestedTopic() { return topic(EventTopics.PAYMENT_REQUESTED); }
-    @Bean NewTopic paymentSucceededTopic() { return topic(EventTopics.PAYMENT_SUCCEEDED); }
-    @Bean NewTopic paymentFailedTopic()    { return topic(EventTopics.PAYMENT_FAILED); }
-    @Bean NewTopic paymentTimedOutTopic()  { return topic(EventTopics.PAYMENT_TIMED_OUT); }
+    @Bean
+    NewTopic paymentRequestedTopic() {
+        return topic(EventTopics.PAYMENT_REQUESTED);
+    }
+
+    @Bean
+    NewTopic paymentSucceededTopic() {
+        return topic(EventTopics.PAYMENT_SUCCEEDED);
+    }
+
+    @Bean
+    NewTopic paymentFailedTopic() {
+        return topic(EventTopics.PAYMENT_FAILED);
+    }
+
+    @Bean
+    NewTopic paymentTimedOutTopic() {
+        return topic(EventTopics.PAYMENT_TIMED_OUT);
+    }
 }

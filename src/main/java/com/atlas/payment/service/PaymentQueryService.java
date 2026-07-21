@@ -1,7 +1,6 @@
 package com.atlas.payment.service;
 
 import com.atlas.payment.dto.PaymentResponse;
-
 import java.util.UUID;
 
 /** Read-side queries for the Payment aggregate (payment.yaml {@code GET /payments/{paymentId}}). */

@@ -2,7 +2,6 @@ package com.atlas.payment.service;
 
 import com.atlas.payment.entity.PaymentStatus;
 import com.atlas.payment.exception.InvalidPaymentStateTransitionException;
-
 import java.util.Map;
 import java.util.Set;
 
@@ -15,13 +14,8 @@ import java.util.Set;
 public final class PaymentStateTransitionGuard {
 
     private static final Map<PaymentStatus, Set<PaymentStatus>> ALLOWED = Map.of(
-            PaymentStatus.CREATED, Set.of(
-                    PaymentStatus.PROCESSING),
-            PaymentStatus.PROCESSING, Set.of(
-                    PaymentStatus.SUCCEEDED,
-                    PaymentStatus.FAILED,
-                    PaymentStatus.TIMED_OUT)
-    );
+            PaymentStatus.CREATED, Set.of(PaymentStatus.PROCESSING),
+            PaymentStatus.PROCESSING, Set.of(PaymentStatus.SUCCEEDED, PaymentStatus.FAILED, PaymentStatus.TIMED_OUT));
 
     private PaymentStateTransitionGuard() {}
 

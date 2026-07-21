@@ -47,7 +47,8 @@ spring:
       observation-enabled: true
     listener:
       observation-enabled: true
-      # pods_max x concurrency <= partitions of inventory.reserved (6) to avoid idle threads.
+      # pods_max x concurrency <= partitions of inventory.reserved (12, ADR-0016) to avoid
+      # idle threads. Deployed: 4 pods x 3 = 12 consumers = 12 partitions (ADR-0015).
       concurrency: ${KAFKA_CONCURRENCY:2}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
