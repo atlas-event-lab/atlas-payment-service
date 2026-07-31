@@ -9,6 +9,7 @@ import com.atlas.payment.entity.Payment;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import feign.FeignException;
 import feign.RetryableException;
+import io.micrometer.observation.annotation.Observed;
 import java.net.SocketTimeoutException;
 import java.time.Clock;
 import java.time.Duration;
@@ -56,6 +57,7 @@ public class PaymentProviderClient {
      * Charges the provider for the given payment, retrying transient failures per the policy.
      * Returns once a terminal outcome (SUCCESS / DECLINED) is reached or attempts are exhausted.
      */
+    @Observed(name = "atlas.payment.provider.charge", contextualName = "payment-provider-charge")
     public ProviderCallResult charge(Payment payment) {
         ProviderChargeRequest request = toRequest(payment);
         List<ProviderAttemptRecord> attempts = new ArrayList<>();
